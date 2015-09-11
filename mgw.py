@@ -24,16 +24,12 @@ def action_helper(data, action, check_if_armed, action_interval, threshold):
     logger.info('Check if armed required, but status is not armed')
     return
 
-  if (data['board_id'] not in action_status):
-    action_status[data['board_id']] = dict()
-  if ('last_action' not in action_status[data['board_id']]):
-    action_status[data['board_id']]['last_action'] = dict()
-  if (data['sensor_type'] not in action_status[data['board_id']]['last_action']):
-    action_status[data['board_id']]['last_action'][data['sensor_type']] = 0
+  action_status.setdefault(data['board_id'], {})
+  action_status[data['board_id']].setdefault(data['sensor_type'], 0)
 
-  if (now - action_status[data['board_id']]['last_action'][data['sensor_type']]  > action_interval):
+  if (now - action_status[data['board_id']][data['sensor_type']]  > action_interval):
     if (threshold(data['sensor_data']) and action(data)):
-      action_status[data['board_id']]['last_action'][data['sensor_type']] = now
+      action_status[data['board_id']][data['sensor_type']] = now
 
 class mgmt_Thread(threading.Thread):
   def __init__(self, s, socket):
