@@ -1,0 +1,241 @@
+<html>
+    <head>
+        <script src="jquery.min.js"></script>
+        <script src="mustache.js"></script>
+        <!--        <script src="highcharts.js"></script> -->
+        <script src="highstock.js"></script>
+        <script src="exporting.js"></script>
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="dist/css/bootstrap.min.css">
+
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="dist/css/bootstrap-theme.min.css">
+        
+        <!-- Custom styles for this template -->
+        <link href="starter-template.css" rel="stylesheet">
+
+        <!-- Latest compiled and minified JavaScript -->
+        <script src="dist/js/bootstrap.min.js"></script>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+            <div class="container">
+                <a class="navbar-brand" href="#">Moteino dashboard</a>
+            </div>
+        </nav>
+        <div class="starter-template">
+            <ul id="mainTabs" class="nav nav-tabs">
+                <li role="presentation"><a href="#status" id="status-tab" data-toggle="tab">Status</a></li>
+                <li role="presentation"><a href="#node" data-toggle="tab">Node</a></li>
+                <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown">Graph<span class="caret"></span></a>
+                    <ul class="dropdown-menu" role="menu">
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Voltage</a></li>
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Temperature</a></li>
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Uptime</a></li>
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">FailedReport</a></li>
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Motion</a></li>
+                        <li><a href="#graph" tabindex="-1" data-toggle="tab">RSSI</a></li>
+                    </ul>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade" id="status"></div>
+                <div class="tab-pane fade" id="node"></div>
+                <div class="tab-pane fade" id="graph"></div>
+            </div>
+        </div>
+    </body>
+    <script>
+        api_endpoint = 'http://localhost:8080/api';
+
+        function refresh_tab(href){
+            var $link = $('li.active a[data-toggle="tab"]');
+            $link.parent().removeClass('active');
+            $(href).tab('show');
+        }
+        function invert_armed(){
+            msg = 'Change armed status?';
+            if (confirm(msg)){
+                $.getJSON(api_endpoint+'/action/invert_armed');
+                refresh_tab(document.getElementById('status-tab'));
+            }
+            return false;
+        }
+        function afterSetExtremes(e) {
+            var chart = $('#graph').highcharts();
+            var json_range = '{"start":'+e.min/1000+',"end":'+e.max/1000+', "last_available": 10}';
+            var what = chart.options.credits.text;
+            chart.showLoading('Loading data from server...');
+            $.postJSON(api_endpoint+'/graph/'+what, json_range, function (data) {
+                $.each(data, function(id_j, value){
+                    var name = data[id_j]['name']
+                    $.each(chart.series, function(id_s, value){
+                        if (chart.series[id_s]['name'] == name){
+                            chart.series[id_s].setData(data[id_j]['data']);
+                        }
+                    });
+                });
+                chart.hideLoading();
+            }); 
+        }
+        jQuery["postJSON"] = function(url, data, callback ) {
+            if ( jQuery.isFunction( data ) ) {
+                callback = data;
+                data = undefined;
+            }
+
+            return jQuery.ajax({
+                url: url,
+                type: "POST",
+                contentType:"application/json; charset=utf-8",
+                dataType: "json",
+                data: data,
+                success: callback
+            });
+        };
+        Highcharts.setOptions({
+            global: {
+                useUTC: false,
+            }
+        });
+    </script>
+    <script>
+        $('.nav-tabs a').click(function(){
+            $(this).tab('show');
+        })
+    </script>
+    <script>
+        $(document).on('ready', function() {
+            $('.nav-tabs a').on('show.bs.tab', function(ev){
+                var what = $(ev.target).text().toLowerCase();
+                var href = $(ev.target).attr("href");
+
+                var graphs = ['temperature', 'voltage', 'uptime', 'failedreport', 'motion', 'rssi'];
+
+                if ("refreshTimer" in window){
+                    clearInterval(refreshTimer);
+                }
+                refreshTimer = setInterval(refresh_tab, 1000*60, this);
+
+                if (what == 'status' || what == 'node'){
+                    if (what == 'status') url = api_endpoint+'/action/status';
+                    if (what == 'node') url = api_endpoint+'/node';
+                    $.getJSON(url).done(function(data){
+                        var template = $('#' + what + 'Template').html();
+                        Mustache.parse(template);
+                        var rendered = Mustache.render(template, data);
+                        $(href).html(rendered);
+                    });
+                } else if (graphs.indexOf(what) >= 0){
+                    switch(what){
+                        case 'temperature':
+                            graph_detail = {chart_type: 'line', graph_title: 'Nodes temperature', y_axis_title: 'Temperature (C)', value_round: 1, what: what};
+                            break;
+                        case 'voltage':
+                            graph_detail = {chart_type: 'line', graph_title: 'Nodes voltage', y_axis_title: 'Voltage (V)', value_round: 2, what: what};
+                            break;
+                        case 'uptime':
+                            graph_detail = {chart_type: 'line', graph_title: 'Nodes uptime', y_axis_title: 'Uptime', value_round: 0, what: what};
+                            break;
+                        case 'failedreport':
+                            graph_detail = {chart_type: 'scatter', graph_title: 'Number of failed reports', y_axis_title: 'Failed reports', value_round: 0, what: what};
+                            break;
+                        case 'motion':
+                            graph_detail = {chart_type: 'scatter', graph_title: 'Detected motion', y_axis_title: 'Motion', value_round: 0, what: what};
+                            break;
+                        case 'rssi':
+                            graph_detail = {chart_type: 'line', graph_title: 'Nodes RSSI', y_axis_title: 'RSSI', value_round: 0, what: what};
+                            break
+
+                    }
+                    $.postJSON(api_endpoint+'/graph/'+what, '{"last_available": 10}', function(data, status){
+                        var chart_begin = new Date(new Date().setYear(new Date().getFullYear() - 2)).getTime();
+                        $('#graph').highcharts('StockChart', {
+                            chart: {
+                                type: graph_detail['chart_type'],
+                            },
+                            title: {
+                                text: graph_detail['graph_title'],
+                            },
+                            xAxis: {
+                                type: 'datetime',
+                                events : {
+                                    afterSetExtremes : afterSetExtremes
+                                },
+                            },
+                            rangeSelector: {
+                                buttons: [{
+                                    type: 'hour',
+                                    count: 1,
+                                    text: '1h'
+                                }, {
+                                    type: 'day',
+                                    count: 1,
+                                    text: '1d'
+                                }, {
+                                    type: 'day',
+                                    count: 7,
+                                    text: '1w'
+                                }, {
+                                    type: 'month',
+                                    count: 1,
+                                    text: '1m'
+                                }, {
+                                    type: 'year',
+                                    count: 1,
+                                    text: '1y'
+                                }],
+                                inputEnabled: true, // it supports only days
+                                allButtonsEnabled: true,
+                                enabled: true,
+                                selected: 0,
+                            },
+                            navigator : {
+                                enabled: true,
+                                adaptToUpdatedData: false,
+                                series : {
+                                    data : [[chart_begin, 0]],
+                                },
+                            },
+                            scrollbar: {
+                                enabled: false,
+                            },
+                            tooltip: {
+                                formatter: function() {
+                                    var s = Highcharts.dateFormat('%A, %d-%m-%Y %H:%M:%S',new Date(this.x));
+                                    var round = graph_detail['value_round'];
+                                    s += '<br/>' + this.series.name + ': <b>' + this.y.toFixed(round) + '</b>';
+                                    return s;
+                                },
+                                shared: false,
+                            },
+                            yAxis: {
+                                title: {
+                                    text: graph_detail['y_axis_title'],
+                                },
+                            },
+                            legend: {
+                                enabled: true,
+                            },
+                            credits: {
+                                text: graph_detail['what'],
+                            },
+                            series: data
+                        });
+                    });
+                }
+            });
+        });
+    </script>
+    <script id="nodeTemplate" type="x-tmpl-mustache">
+        {{#.}}
+        <h3><span class="label label-default">{{desc}} ({{name}})</span></h3>
+        {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
+        {{/.}}
+    </script>
+    <script id="statusTemplate" type="x-tmpl-mustache">
+        <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_armed()">Armed: {{armed}}</a></span></h3>
+        <h3><span class="label label-default">MDS Enabled: {{msd_enabled}}</span></h3>
+    </script>
+</html>

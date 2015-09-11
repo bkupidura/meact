@@ -1,0 +1,22 @@
+{
+  "logging": {
+    "level": 10,
+    "file": "/Users/zynzel/mgw/main/mgw.log"
+  },
+  "serial": {
+    "device": "/dev/cu.usbserial-DA01IIY6",
+    "speed": 115200,
+    "timeout": 20
+  },
+  "msd":{
+    "cache_time": 60,
+    "failure_value": 300,
+    "failure_query": "SELECT board_id,last_update FROM (SELECT * FROM sensors GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>?"
+  },
+  "loop_sleep": 10,
+  "db_file": "/Users/zynzel/mgw/main/sensor.db",
+  "pid_file": "/Users/zynzel/mgw/main/mgw.pid",
+  "daemon": 0,
+  "mgmt_socket": "/tmp/mgw.sock",
+  "gateway_ping_time": 120
+}
