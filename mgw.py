@@ -133,7 +133,7 @@ class failure_Thread(threading.Thread):
     self.failure_query = failure_query
     self.failed = {}
 
-  def handle_failed(failed_node, failed_value):
+  def handle_failed(self, failed_node, failed_value):
     now = int(time.time())
     if self.name == 'msd':
       self.logger.warning('No update from board {} since {} seconds'.format(failed_node,
