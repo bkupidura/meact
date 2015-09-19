@@ -4,10 +4,6 @@ body {
 .starter-template {
   padding: 40px 15px;
 }
-/*.label {
-  margin-left: 5px;
-}
- */
 /* bootstrap hack: fix content width inside hidden tabs */
 .tab-content > .tab-pane,
 .pill-content > .pill-pane {

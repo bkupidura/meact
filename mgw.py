@@ -98,6 +98,7 @@ class mgmt_Thread(threading.Thread):
           self.logger.warning('Got exception \'{}\' while reading from socket'.format(e))
           continue
         if 'action' in data:
+          self.logger.info('Got \'{}\' on mgmt socket'.format(data))
           if data['action'] == 'status':
             conn.send(json.dumps(STATUS))
           elif data['action'] == 'send' and 'data' in data:
@@ -105,10 +106,9 @@ class mgmt_Thread(threading.Thread):
               r_cmd = str(data['data']['nodeid'])+":"+str(data['data']['cmd'])
               self.serial.write(r_cmd)
             except (IOError, ValueError, serial.serialutil.SerialException) as e:
-              self.logger.error('Fail to send command ({}) to remote node'.format(r_cmd))
+              self.logger.error('Fail to send command \'{}\' to remote node'.format(r_cmd))
           elif data['action'] == 'set' and 'data' in data:
             for key in data['data']:
-              self.logger.warning('Setting {} to {}'.format(key, data['data'][key]))
               STATUS[key] = data['data'][key]
               if key == 'mgw_enabled':
                 self.mgw.enabled.set() if data['data'][key] else self.mgw.enabled.clear()
@@ -169,6 +169,7 @@ class mgw_Thread(threading.Thread):
     self.logger = logger
     self.serial = serial
     self.loop_sleep = loop_sleep
+    self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
     self.db_file = db_file
     self.s_type_map = load_config('sensors.config.json')
@@ -177,24 +178,43 @@ class mgw_Thread(threading.Thread):
   def ping_gateway(self):
     try:
       self.serial.write('1:1')
+      time.sleep(1)
     except (IOError, ValueError, serial.serialutil.SerialException) as e:
-      logger.error('Failed to get measure from gateway: {}'.format(e))
-    time.sleep(1)
-    return int(time.time())
+      self.logger.error('Failed to get measure from gateway: {}'.format(e))
+    else:
+      self.last_gw_ping = int(time.time())
 
-  def action_helper(self, data, action, check_if_armed, action_interval, threshold):
-    self.logger.debug('Action helper for data: {}'.format(data))
+  def action_helper(self, data, action_details):
+    action_details.setdefault('check_if_armed', True)
+    action_details.setdefault('action_interval', 0)
+    action_details.setdefault('threshold', 'lambda x: True')
+    action_details.setdefault('fail_count', 0)
+    action_details.setdefault('fail_interval', 600)
+
+    self.logger.debug('Action helper for data: \'{}\' action_details: \'{}\''.format(data, action_details))
     now = int(time.time())
-    if (check_if_armed) and (not STATUS['armed']):
-      self.logger.info('Check if armed required, but status is not armed')
-      return
 
     self.action_status.setdefault(data['board_id'], {})
-    self.action_status[data['board_id']].setdefault(data['sensor_type'], 0)
+    self.action_status[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
 
-    if (now - self.action_status[data['board_id']][data['sensor_type']] > action_interval):
-      if (threshold(data['sensor_data']) and action(self.logger, data)):
-        self.action_status[data['board_id']][data['sensor_type']] = now
+    self.action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
+      [i for i in self.action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+
+    if (action_details['check_if_armed']) and (not STATUS['armed']):
+      return
+
+    if not eval(action_details['threshold'])(data['sensor_data']):
+      return
+
+    if len(self.action_status[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
+      self.action_status[data['board_id']][data['sensor_type']]['last_fail'].append(now)
+      return
+
+    if (now - self.action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
+      return
+
+    if eval(action_details['action'])(self.logger, data):
+      self.action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
   def run(self):
     self.logger.info('Starting')
@@ -203,7 +223,6 @@ class mgw_Thread(threading.Thread):
     #[ID][metric:value] / [10][voltage:3.3]
     re_data = re.compile('\[(\d+)\]\[(.+):(.+)\]')
 
-    last_gw_ping = 0
     data = {}
 
     while True:
@@ -227,19 +246,19 @@ class mgw_Thread(threading.Thread):
           self.logger.debug('> {}'.format(s_data))
         continue
       finally:
-        if (int(time.time()) - last_gw_ping >= self.gateway_ping_time):
-          last_gw_ping = self.ping_gateway()
+        if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
+          self.ping_gateway()
 
-      self.logger.debug('Got data from serial {}'.format(data))
+      self.logger.debug('Got data from serial \'{}\''.format(data))
 
       try:
         self.db.execute("INSERT INTO sensors(board_id, sensor_type, data) VALUES(?, ?, ?)",
                 (data['board_id'], data['sensor_type'], data['sensor_data']))
         self.db.commit()
       except (sqlite3.IntegrityError) as e:
-        self.logger.error('Integrity error {}'.format(e))
+        self.logger.error('Integrity error \'{}\''.format(e))
       except (sqlite3.OperationalError) as e:
-        time.sleep(random.randint(1,5))
+        time.sleep(1+random.random())
         try:
           self.db.commit()
         except (sqlite3.OperationalError) as e:
@@ -247,15 +266,11 @@ class mgw_Thread(threading.Thread):
 
       try:
         action_details = self.s_type_map[data['sensor_type']]
+        action_details['action']
       except (KeyError) as e:
-        self.logger.debug('Missing s_type_map for sensor_type {}'.format(data['sensor_type']))
-        continue
-
-      self.action_helper(data,
-        eval(action_details['action']),
-        action_details.get('check_if_armed', 1),
-        action_details.get('action_interval', 0),
-        eval(action_details.get('threshold', 'lambda x: True')))
+        self.logger.debug('Missing s_type_map/action for sensor_type \'{}\''.format(data['sensor_type']))
+      else:
+        self.action_helper(data, action_details)
 
 STATUS = {
   "armed": 1,
