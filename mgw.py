@@ -8,9 +8,9 @@ import random
 import logging
 import sys
 import os
-import daemonocle
 import socket
 import re
+import argparse
 
 def notify(logger, data):
   logger.info('Performing notify action for data {}'.format(data))
@@ -29,8 +29,8 @@ def connect_db(db_file):
   db = sqlite3.connect(db_file)
   return db
 
-def create_db(db_file, create_sensor_table=False):
-  board_map = load_config('boards.config.json')
+def create_db(db_file, dir, create_sensor_table=False):
+  board_map = load_config(dir + '/boards.config.json')
   db = connect_db(db_file)
   db.execute("DROP TABLE IF EXISTS board_desc");
   db.execute('''CREATE TABLE board_desc(board_id TEXT PRIMARY KEY, board_desc TEXT)''');
@@ -41,16 +41,33 @@ def create_db(db_file, create_sensor_table=False):
   db.commit()
 
   if (create_sensor_table):
-    db.execute("DROP TABLE IF EXISTS sensors")
-    db.execute('''CREATE TABLE sensors (id INTEGER PRIMARY KEY AUTOINCREMENT, board_id TEXT, sensor_type TEXT,
+    db.execute("DROP TABLE IF EXISTS metrics")
+    db.execute('''CREATE TABLE metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, board_id TEXT, sensor_type TEXT,
       last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')), data TEXT DEFAULT NULL)''')
 
-def create_logger(level, log_file, daemon):
+    db.execute("DROP INDEX IF EXISTS idx_board_id")
+    db.execute("CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data)")
+
+  db.execute("DROP TABLE IF EXISTS last_metrics")
+  db.execute("CREATE TABLE last_metrics (board_id TEXT, sensor_type TEXT, last_update TIMESTAMP, data TEXT)")
+
+  db.execute("DROP TRIGGER IF EXISTS insert_metric")
+  db.execute('''CREATE TRIGGER insert_metric INSERT ON metrics WHEN NOT EXISTS(SELECT 1 FROM last_metrics
+    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN INSERT into last_metrics
+    values(new.board_id, new.sensor_type, new.last_update, new.data); END''')
+
+  db.execute("DROP TRIGGER IF EXISTS update_metric")
+  db.execute('''CREATE TRIGGER update_metric INSERT ON metrics WHEN EXISTS(SELECT 1 FROM last_metrics
+    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN UPDATE last_metrics
+    SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id
+    and sensor_type==new.sensor_type; END''')
+
+def create_logger(level, log_file=None):
   logger = logging.getLogger()
   logger.setLevel(level)
   formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
 
-  if daemon:
+  if log_file:
     handler = logging.FileHandler(log_file)
   else:
     handler = logging.StreamHandler(sys.stdout)
@@ -61,20 +78,23 @@ def create_logger(level, log_file, daemon):
   return logger
 
 class mgmt_Thread(threading.Thread):
-  def __init__(self, conf, daemon):
+  def __init__(self, dir):
     threading.Thread.__init__(self)
     threading.current_thread().name = 'mgmt'
-    self._daemon = daemon
     self.daemon = True
+    self.dir = dir
+
+    conf = load_config(self.dir + '/global.config.json')
+
     self.socket = conf['mgmt_socket']
     self.serial = serial.Serial(conf['serial']['device'], conf['serial']['speed'], timeout=conf['serial']['timeout'])
-    self.logger = create_logger(conf['logging']['level'], conf['logging']['file'], conf['daemon'])
+    self.logger = create_logger(conf['logging']['level'], conf['logging'].get('file'))
 
     self.msd = failure_Thread('msd', self.logger, conf['loop_sleep'],
       conf['db_file'], conf['msd']['cache_time'],
       conf['msd']['failure_value'],
       conf['msd']['failure_query']) #Missing sensor detector
-    self.mgw = mgw_Thread(self.logger, self.serial, conf['loop_sleep'], conf['gateway_ping_time'], conf['db_file'])
+    self.mgw = mgw_Thread(self.logger, self.serial, conf['loop_sleep'], conf['gateway_ping_time'], conf['db_file'], self.dir)
 
   def run(self):
     self.logger.info('Starting')
@@ -151,7 +171,6 @@ class failure_Thread(threading.Thread):
           if now - self.failed[failed_node] > self.cache_time:
             self.logger.debug('Removing failed node {} from cache'.format(failed_node))
             del self.failed[failed_node]
-            self.handle_failed(failed_node, failed_value)
         else:
           self.failed[failed_node] = now
           self.handle_failed(failed_node, failed_value)
@@ -159,12 +178,12 @@ class failure_Thread(threading.Thread):
       time.sleep(self.loop_sleep)
 
 class mgw_Thread(threading.Thread):
-  def __init__(self, logger, serial, loop_sleep, gateway_ping_time, db_file):
+  def __init__(self, logger, serial, loop_sleep, gateway_ping_time, db_file, dir):
     threading.Thread.__init__(self)
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS["msd_enabled"]:
+    if STATUS["mgw_enabled"]:
       self.enabled.set()
     self.logger = logger
     self.serial = serial
@@ -172,7 +191,7 @@ class mgw_Thread(threading.Thread):
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
     self.db_file = db_file
-    self.s_type_map = load_config('sensors.config.json')
+    self.s_type_map = load_config(dir + '/sensors.config.json')
     self.action_status = {}
 
   def ping_gateway(self):
@@ -252,7 +271,7 @@ class mgw_Thread(threading.Thread):
       self.logger.debug('Got data from serial \'{}\''.format(data))
 
       try:
-        self.db.execute("INSERT INTO sensors(board_id, sensor_type, data) VALUES(?, ?, ?)",
+        self.db.execute("INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
                 (data['board_id'], data['sensor_type'], data['sensor_data']))
         self.db.commit()
       except (sqlite3.IntegrityError) as e:
@@ -279,13 +298,9 @@ STATUS = {
 }
 
 if __name__ == "__main__":
-  conf = load_config('global.config.json')
-  daemon = daemonocle.Daemon(pidfile=conf['pid_file'], detach=conf['daemon'])
-  mgmt = mgmt_Thread(conf=conf, daemon=daemon)
+  parser = argparse.ArgumentParser(description='Moteino gateway')
+  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  args = parser.parse_args()
 
-  if len(sys.argv) < 2:
-    print('Usage: start|stop|restart|status')
-    sys.exit(1)
-
-  daemon.worker = mgmt.run
-  daemon.do_action(sys.argv[1])
+  mgmt = mgmt_Thread(dir=args.dir)
+  mgmt.run()

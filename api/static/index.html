@@ -47,7 +47,7 @@
         </div>
     </body>
     <script>
-        api_endpoint = 'http://localhost:8080/api';
+        api_endpoint = parent.location.protocol+'//'+window.location.hostname+':'+window.location.port+'/api';
 
         function refresh_tab(href){
             var $link = $('li.active a[data-toggle="tab"]');
@@ -146,8 +146,7 @@
                             break;
                         case 'rssi':
                             graph_detail = {chart_type: 'line', graph_title: 'Nodes RSSI', y_axis_title: 'RSSI', value_round: 0, what: what};
-                            break
-
+                            break;
                     }
                     $.postJSON(api_endpoint+'/graph/'+what, '{"last_available": 10}', function(data, status){
                         var chart_begin = new Date(new Date().setYear(new Date().getFullYear() - 2)).getTime();

@@ -7,6 +7,9 @@ import netaddr
 from datetime import datetime
 import bottle
 import bottle.ext.sqlite
+import argparse
+
+app = bottle.Bottle()
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
@@ -16,10 +19,6 @@ def load_config(config_name):
     config = json.load(json_config)
 
   return config
-
-conf = load_config('global.config.json')
-
-app = bottle.Bottle()
 
 def write2socket(data, response = False):
   client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -87,7 +86,7 @@ def get_nodes(db, node_id = False):
   output = list()
   for node in desc:
     o_metric = list()
-    metrics = db.execute('SELECT sensor_type,data FROM sensors WHERE board_id=? and last_update >= ? and last_update <= ? group by sensor_type',
+    metrics = db.execute('SELECT sensor_type,data FROM last_metrics WHERE board_id=? and last_update >= ? and last_update <= ?',
       (node, start, end)).fetchall()
     for metric in metrics:
       o_metric.append(tuple(metric))
@@ -109,7 +108,7 @@ def get_graph(db, graph_type = 'uptime'):
 
   graph_type = str(graph_type)
 
-  nodes = db.execute('SELECT DISTINCT(board_id) FROM sensors WHERE sensor_type = ?', (graph_type, )).fetchall()
+  nodes = db.execute('SELECT board_id FROM last_metrics WHERE sensor_type = ?', (graph_type, )).fetchall()
 
   output = list()
 
@@ -118,11 +117,11 @@ def get_graph(db, graph_type = 'uptime'):
     node_id = node[0]
 
     desc = dict(db.execute('SELECT board_id,board_desc FROM board_desc WHERE board_id=?', (node_id, )).fetchall())
-    metrics = db.execute('SELECT last_update,data FROM sensors WHERE sensor_type = ? AND board_id = ? AND last_update >= ? AND last_update <= ?',
+    metrics = db.execute('SELECT last_update,data FROM metrics WHERE sensor_type = ? AND board_id = ? AND last_update >= ? AND last_update <= ?',
       (graph_type, node_id, start, end)).fetchall()
 
     if (len(metrics) == 0 and last_available):
-      metrics = db.execute('''SELECT last_update,data FROM (SELECT id,last_update,data from sensors WHERE
+      metrics = db.execute('''SELECT last_update,data FROM (SELECT id,last_update,data from metrics WHERE
         sensor_type = ? AND board_id = ? ORDER BY id DESC LIMIT ?) order by id''',
         (graph_type, node_id, last_available)).fetchall()
 
@@ -134,7 +133,13 @@ def get_graph(db, graph_type = 'uptime'):
 
   return json.dumps(output)
 
-plugin = bottle.ext.sqlite.Plugin(dbfile=conf['db'])
-app.install(plugin)
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='Moteino gateway API')
+  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  args = parser.parse_args()
 
-app.run(host='localhost', port=8080, debug=conf['debug'])
+  conf = load_config(args.dir+'/global.config.json')
+  plugin = bottle.ext.sqlite.Plugin(dbfile=conf['db'])
+  app.install(plugin)
+
+  app.run(host='0.0.0.0', port=8080, debug=conf['debug'])
