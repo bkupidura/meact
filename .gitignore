@@ -1,4 +1,4 @@
-sensor.db
+mgw.db
 boards.config.json
 sensors.config.json
 **/global.config.json

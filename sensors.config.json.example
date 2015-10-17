@@ -5,6 +5,6 @@
     "action_interval": 360,
     "threshold": "lambda x: float(x)<3.2",
     "fail_count": 2,
-    "fail_interval": 60
+    "fail_interval": 300
   }
 }

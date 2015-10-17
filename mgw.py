@@ -11,10 +11,106 @@ import os
 import socket
 import re
 import argparse
+import urllib
+import smtplib
 
-def notify(logger, data):
+def notify(logger, data, action_config):
   logger.info('Performing notify action for data {}'.format(data))
+
+  if 'message' in data:
+    msg = data['message']
+  else:
+    msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
+            data['board_desc'], data['board_id'], data['sensor_data'])
+
+  if action_config:
+    try:
+      send_sms(logger, msg, action_config)
+    except Exception as e:
+      logger.warning('Got exception during send sms {}'.format(e))
+    try:
+      send_mail(logger, msg, action_config)
+    except Exception as e:
+      logger.warning('Got exception during send mail {}'.format(e))
+
   return True
+
+def send_sms(logger, data, action_config):
+  if not action_config['sms_enabled']:
+    return True
+
+  logger.debug('Sending SMS')
+
+  url = action_config['sms_endpoint']
+  params = {'username': action_config['sms_user'],
+          'password': action_config['sms_password'],
+          'msisdn': action_config['sms_recipient'],
+          'message': data}
+
+  params = urllib.urlencode(params)
+  f = urllib.urlopen(url, params)
+  s = f.read()
+  f.close()
+
+  result = s.split('|')
+  if result[0] != '0':
+    logger.warning('Fail to send SMS {} {}'.format(result[0], result[1]))
+    return False
+
+  return True
+
+def send_mail(logger, data, action_config):
+  if not action_config['mail_enabled']:
+    return True
+
+  logger.debug('Sending mail')
+
+  message = "From: {}\nTo: {}\nSubject: {}\n\n{}\n\n".format(action_config['mail_sender'],
+          action_config['mail_recipient'],
+          action_config['mail_subject'],
+          data)
+
+  s = smtplib.SMTP(action_config['mail_host'], action_config['mail_port'])
+  s.starttls()
+  s.login(action_config['mail_user'], action_config['mail_password'])
+
+  s.sendmail(action_config['mail_sender'], action_config['mail_recipient'], message)
+  s.quit()
+
+  return True
+
+
+def action_helper(logger, data, action_details, action_config=None):
+  action_details.setdefault('check_if_armed', True)
+  action_details.setdefault('action_interval', 0)
+  action_details.setdefault('threshold', 'lambda x: True')
+  action_details.setdefault('fail_count', 0)
+  action_details.setdefault('fail_interval', 600)
+
+  logger.debug('Action helper for data: \'{}\' action_details: \'{}\''.format(data, action_details))
+  now = int(time.time())
+
+  action_status.setdefault(data['board_id'], {})
+  action_status[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
+
+  action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
+    [i for i in action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+
+  if (action_details['check_if_armed']) and (not STATUS['armed']):
+    return
+
+  if not eval(action_details['threshold'])(data['sensor_data']):
+    return
+
+  if len(action_status[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
+    action_status[data['board_id']][data['sensor_type']]['last_fail'].append(now)
+    return
+
+  if (now - action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
+    return
+
+  if eval(action_details['action'])(logger, data, action_config):
+    action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
@@ -29,8 +125,8 @@ def connect_db(db_file):
   db = sqlite3.connect(db_file)
   return db
 
-def create_db(db_file, dir, create_sensor_table=False):
-  board_map = load_config(dir + '/boards.config.json')
+def create_db(db_file, appdir, create_sensor_table=False):
+  board_map = load_config(appdir + '/boards.config.json')
   db = connect_db(db_file)
   db.execute("DROP TABLE IF EXISTS board_desc");
   db.execute('''CREATE TABLE board_desc(board_id TEXT PRIMARY KEY, board_desc TEXT)''');
@@ -78,23 +174,34 @@ def create_logger(level, log_file=None):
   return logger
 
 class mgmt_Thread(threading.Thread):
-  def __init__(self, dir):
+  def __init__(self, appdir):
     threading.Thread.__init__(self)
     threading.current_thread().name = 'mgmt'
     self.daemon = True
-    self.dir = dir
 
-    conf = load_config(self.dir + '/global.config.json')
+    conf = load_config(appdir + '/global.config.json')
+    board_map = load_config(appdir + '/boards.config.json')
+    sensor_map = load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
-    self.serial = serial.Serial(conf['serial']['device'], conf['serial']['speed'], timeout=conf['serial']['timeout'])
-    self.logger = create_logger(conf['logging']['level'], conf['logging'].get('file'))
+    self.serial = serial.Serial(conf['serial']['device'],
+            conf['serial']['speed'],
+            timeout=conf['serial']['timeout'])
+    self.logger = create_logger(conf['logging']['level'],
+            conf['logging'].get('file'))
 
     self.msd = failure_Thread('msd', self.logger, conf['loop_sleep'],
-      conf['db_file'], conf['msd']['cache_time'],
-      conf['msd']['failure_value'],
-      conf['msd']['failure_query']) #Missing sensor detector
-    self.mgw = mgw_Thread(self.logger, self.serial, conf['loop_sleep'], conf['gateway_ping_time'], conf['db_file'], self.dir)
+            conf['db_file'], conf['msd']['cache_time'],
+            conf['msd']['failure_value'],
+            conf['msd']['failure_query'],
+            board_map,
+            conf['action_config']) #Missing sensor detector
+    self.mgw = mgw_Thread(self.logger, self.serial, conf['loop_sleep'],
+            conf['gateway_ping_time'],
+            conf['db_file'],
+            board_map,
+            sensor_map,
+            conf['action_config'])
 
   def run(self):
     self.logger.info('Starting')
@@ -105,11 +212,11 @@ class mgmt_Thread(threading.Thread):
     if os.path.exists(self.socket):
       os.remove(self.socket)
 
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(self.socket)
-    server.listen(1)
+    self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    self.server.bind(self.socket)
+    self.server.listen(1)
     while True:
-      conn, addr = server.accept()
+      conn, addr = self.server.accept()
       data = conn.recv(1024)
       if data:
         try:
@@ -138,7 +245,7 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 class failure_Thread(threading.Thread):
-  def __init__(self, name, logger, loop_sleep, db_file, cache_time, failure_value, failure_query):
+  def __init__(self, name, logger, loop_sleep, db_file, cache_time, failure_value, failure_query, board_map, action_config):
     threading.Thread.__init__(self)
     self.name = name
     self.daemon = True
@@ -151,13 +258,21 @@ class failure_Thread(threading.Thread):
     self.cache_time = cache_time
     self.failure_value = failure_value
     self.failure_query = failure_query
+    self.board_map = board_map
+    self.action_config = action_config
     self.failed = {}
 
   def handle_failed(self, failed_node, failed_value):
     now = int(time.time())
     if self.name == 'msd':
-      self.logger.warning('No update from board {} since {} seconds'.format(failed_node,
-          now - failed_value))
+      message = 'No update from {} ({}) since {} seconds'.format(self.board_map[failed_node],
+              failed_node, now - failed_value)
+      self.logger.warning(message)
+
+      data = {'board_id': failed_node, 'sensor_type': 'missing', 'sensor_data': 1, 'message': message}
+      action_details = {'action': 'notify', 'check_if_armed': False, 'action_interval': self.cache_time * 10}
+
+      action_helper(self.logger, data, action_details, self.action_config.get(action_details['action']))
 
   def run(self):
     self.logger.info('Starting')
@@ -178,7 +293,7 @@ class failure_Thread(threading.Thread):
       time.sleep(self.loop_sleep)
 
 class mgw_Thread(threading.Thread):
-  def __init__(self, logger, serial, loop_sleep, gateway_ping_time, db_file, dir):
+  def __init__(self, logger, ser, loop_sleep, gateway_ping_time, db_file, board_map, sensor_map, action_config):
     threading.Thread.__init__(self)
     self.name = 'mgw'
     self.daemon = True
@@ -186,13 +301,14 @@ class mgw_Thread(threading.Thread):
     if STATUS["mgw_enabled"]:
       self.enabled.set()
     self.logger = logger
-    self.serial = serial
+    self.serial = ser
     self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
     self.db_file = db_file
-    self.s_type_map = load_config(dir + '/sensors.config.json')
-    self.action_status = {}
+    self.s_type_map = sensor_map
+    self.board_map = board_map
+    self.action_config = action_config
 
   def ping_gateway(self):
     try:
@@ -202,38 +318,6 @@ class mgw_Thread(threading.Thread):
       self.logger.error('Failed to get measure from gateway: {}'.format(e))
     else:
       self.last_gw_ping = int(time.time())
-
-  def action_helper(self, data, action_details):
-    action_details.setdefault('check_if_armed', True)
-    action_details.setdefault('action_interval', 0)
-    action_details.setdefault('threshold', 'lambda x: True')
-    action_details.setdefault('fail_count', 0)
-    action_details.setdefault('fail_interval', 600)
-
-    self.logger.debug('Action helper for data: \'{}\' action_details: \'{}\''.format(data, action_details))
-    now = int(time.time())
-
-    self.action_status.setdefault(data['board_id'], {})
-    self.action_status[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
-
-    self.action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
-      [i for i in self.action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
-
-    if (action_details['check_if_armed']) and (not STATUS['armed']):
-      return
-
-    if not eval(action_details['threshold'])(data['sensor_data']):
-      return
-
-    if len(self.action_status[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
-      self.action_status[data['board_id']][data['sensor_type']]['last_fail'].append(now)
-      return
-
-    if (now - self.action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
-      return
-
-    if eval(action_details['action'])(self.logger, data):
-      self.action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
   def run(self):
     self.logger.info('Starting')
@@ -289,18 +373,20 @@ class mgw_Thread(threading.Thread):
       except (KeyError) as e:
         self.logger.debug('Missing s_type_map/action for sensor_type \'{}\''.format(data['sensor_type']))
       else:
-        self.action_helper(data, action_details)
+        data['board_desc'] = self.board_map[str(data['board_id'])]
+        action_helper(self.logger, data, action_details, self.action_config.get(action_details['action']))
 
 STATUS = {
   "armed": 1,
   "msd_enabled": 1,
   "mgw_enabled": 1,
 }
+action_status = {}
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Moteino gateway')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
-  mgmt = mgmt_Thread(dir=args.dir)
+  mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.run()
