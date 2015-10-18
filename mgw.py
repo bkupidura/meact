@@ -14,8 +14,13 @@ import argparse
 import urllib
 import smtplib
 
-def notify(logger, data, action_config):
-  logger.info('Performing notify action for data {}'.format(data))
+def log(logger, data, action_config):
+  logger.info("Log action for data: {}".format(data))
+  return True
+
+def send_sms(logger, data, action_config):
+  if not action_config['send_sms']['enabled']:
+    return False
 
   if 'message' in data:
     msg = data['message']
@@ -23,29 +28,13 @@ def notify(logger, data, action_config):
     msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
             data['board_desc'], data['board_id'], data['sensor_data'])
 
-  if action_config:
-    try:
-      send_sms(logger, msg, action_config)
-    except Exception as e:
-      logger.warning('Got exception during send sms {}'.format(e))
-    try:
-      send_mail(logger, msg, action_config)
-    except Exception as e:
-      logger.warning('Got exception during send mail {}'.format(e))
-
-  return True
-
-def send_sms(logger, data, action_config):
-  if not action_config['sms_enabled']:
-    return True
-
   logger.debug('Sending SMS')
 
-  url = action_config['sms_endpoint']
-  params = {'username': action_config['sms_user'],
-          'password': action_config['sms_password'],
-          'msisdn': action_config['sms_recipient'],
-          'message': data}
+  url = action_config['send_sms']['endpoint']
+  params = {'username': action_config['send_sms']['user'],
+          'password': action_config['send_sms']['password'],
+          'msisdn': action_config['send_sms']['recipient'],
+          'message': msg}
 
   params = urllib.urlencode(params)
   f = urllib.urlopen(url, params)
@@ -60,25 +49,41 @@ def send_sms(logger, data, action_config):
   return True
 
 def send_mail(logger, data, action_config):
-  if not action_config['mail_enabled']:
-    return True
+  if not action_config['send_mail']['enabled']:
+    return False
+
+  if 'message' in data:
+    msg = data['message']
+  else:
+    msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
+            data['board_desc'], data['board_id'], data['sensor_data'])
 
   logger.debug('Sending mail')
 
-  message = "From: {}\nTo: {}\nSubject: {}\n\n{}\n\n".format(action_config['mail_sender'],
-          action_config['mail_recipient'],
-          action_config['mail_subject'],
-          data)
+  message = "From: {}\nTo: {}\nSubject: {}\n\n{}\n\n".format(action_config['send_mail']['sender'],
+          action_config['send_mail']['recipient'],
+          action_config['send_mail']['subject'],
+          msg)
 
-  s = smtplib.SMTP(action_config['mail_host'], action_config['mail_port'])
+  s = smtplib.SMTP(action_config['send_mail']['host'], action_config['send_mail']['port'])
   s.starttls()
-  s.login(action_config['mail_user'], action_config['mail_password'])
+  s.login(action_config['send_mail']['user'], action_config['send_mail']['password'])
 
-  s.sendmail(action_config['mail_sender'], action_config['mail_recipient'], message)
+  s.sendmail(action_config['send_mail']['sender'], action_config['send_mail']['recipient'], message)
   s.quit()
 
   return True
 
+def action_execute(logger, data, action, action_config):
+  result = 0
+  for a in action:
+    logger.debug('Action execute for action: {}'.format(a))
+    if not eval(a['name'])(logger, data, action_config):
+      if 'failback' in a:
+        result += action_execute(logger, data, a['failback'], action_config)
+    else:
+      result += 1
+  return result
 
 def action_helper(logger, data, action_details, action_config=None):
   action_details.setdefault('check_if_armed', True)
@@ -109,7 +114,7 @@ def action_helper(logger, data, action_details, action_config=None):
   if (now - action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
     return
 
-  if eval(action_details['action'])(logger, data, action_config):
+  if action_execute(logger, data, action_details['action'], action_config):
     action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
 def load_config(config_name):
@@ -194,6 +199,7 @@ class mgmt_Thread(threading.Thread):
             conf['db_file'], conf['msd']['cache_time'],
             conf['msd']['failure_value'],
             conf['msd']['failure_query'],
+            conf['msd']['failure_action'],
             board_map,
             conf['action_config']) #Missing sensor detector
     self.mgw = mgw_Thread(self.logger, self.serial, conf['loop_sleep'],
@@ -245,7 +251,7 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 class failure_Thread(threading.Thread):
-  def __init__(self, name, logger, loop_sleep, db_file, cache_time, failure_value, failure_query, board_map, action_config):
+  def __init__(self, name, logger, loop_sleep, db_file, cache_time, failure_value, failure_query, failure_action, board_map, action_config):
     threading.Thread.__init__(self)
     self.name = name
     self.daemon = True
@@ -258,21 +264,24 @@ class failure_Thread(threading.Thread):
     self.cache_time = cache_time
     self.failure_value = failure_value
     self.failure_query = failure_query
+    self.failure_action = failure_action
     self.board_map = board_map
     self.action_config = action_config
     self.failed = {}
 
   def handle_failed(self, failed_node, failed_value):
     now = int(time.time())
+    data = {'board_id': failed_node, 'sensor_data': 1}
+    action_details = {'check_if_armed': False, 'action_interval': self.cache_time * 10, 'action': self.failure_action}
+
     if self.name == 'msd':
       message = 'No update from {} ({}) since {} seconds'.format(self.board_map[failed_node],
               failed_node, now - failed_value)
+
       self.logger.warning(message)
 
-      data = {'board_id': failed_node, 'sensor_type': 'missing', 'sensor_data': 1, 'message': message}
-      action_details = {'action': 'notify', 'check_if_armed': False, 'action_interval': self.cache_time * 10}
-
-      action_helper(self.logger, data, action_details, self.action_config.get(action_details['action']))
+      data.update({'sensor_type': 'missing', 'message': message})
+      action_helper(self.logger, data, action_details, self.action_config)
 
   def run(self):
     self.logger.info('Starting')
@@ -374,7 +383,7 @@ class mgw_Thread(threading.Thread):
         self.logger.debug('Missing s_type_map/action for sensor_type \'{}\''.format(data['sensor_type']))
       else:
         data['board_desc'] = self.board_map[str(data['board_id'])]
-        action_helper(self.logger, data, action_details, self.action_config.get(action_details['action']))
+        action_helper(self.logger, data, action_details, self.action_config)
 
 STATUS = {
   "armed": 1,

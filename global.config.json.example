@@ -10,23 +10,26 @@
   "msd":{
     "cache_time": 60,
     "failure_value": 300,
-    "failure_query": "SELECT board_id,last_update FROM (SELECT board_id,max(last_update) as last_update FROM last_metrics GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>?"
+    "failure_query": "SELECT board_id,last_update FROM (SELECT board_id,max(last_update) as last_update FROM last_metrics GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>?",
+    "failure_action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}]
   },
   "action_config": {
-    "notify": {
-      "sms_endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
-      "sms_user": "user",
-      "sms_password": "password",
-      "sms_recipient": ["+48000000000"],
-      "sms_enabled": 0,
-      "mail_sender": "notify@example.com",
-      "mail_recipient": "root@example.com",
-      "mail_subject": "RPI notification",
-      "mail_host": "email-smtp.eu-west-1.amazonaws.com",
-      "mail_port": 587,
-      "mail_user": "user",
-      "mail_password": "password",
-      "mail_enabled": 1
+    "send_sms": {
+      "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
+      "user": "user",
+      "password": "password",
+      "recipient": ["+48000000000"],
+      "enabled": 1
+    },
+    "send_mail": {
+      "sender": "notify@example.com",
+      "recipient": "root@example.com",
+      "subject": "RPI notification",
+      "host": "email-smtp.eu-west-1.amazonaws.com",
+      "port": 587,
+      "user": "user",
+      "password": "password",
+      "enabled": 1
     }
   },
   "loop_sleep": 10,
