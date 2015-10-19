@@ -1,7 +1,7 @@
 {
   "mgmt_socket": "/tmp/mgw.sock",
   "db": "/Users/zynzel/mgw/main/mgw.db",
-  "static_dir": "/Users/zynzel/mgw/main/api/static",
+  "static_dir": "/Users/prmtl/projects/mgw/main/api/static",
   "allowed_cidrs": ["127.0.0.1/24"],
   "debug": 1
 }

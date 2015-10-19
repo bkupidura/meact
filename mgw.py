@@ -10,14 +10,56 @@ import sys
 import os
 import socket
 import re
+# jeżeli masz jakieś zalezności spoza biblioteki standardowej,
+# to zapisz sobie je w pliku requirements.txt i używaj pip do ich
+# instalacji https://pip.readthedocs.org/en/stable/user_guide/#requirements-files
 import argparse
 import requests
 import smtplib
+
+
+# mozesz zainicjalizowac logger przez:
+#
+# LOG = logging.getLogger(__name__)
+#
+# i potem używać go w pliku
+#
+# LOG.debug('123')
+#
+# potem w "main" swojej aplikacji odpalasz tylko swoją
+# funckje "create_logger" i już nie musisz przekazywać
+# loggera do każdej funkcji:
+#
+# if __name__ == "__main__":
+#   parser = argparse.ArgumentParser(description='Moteino gateway')
+#   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+#   args = parser.parse_args()
+#
+#   create_logger()
+#
+#   mgmt = mgmt_Thread(appdir=args.dir)
+#   mgmt.run()
 
 def log(logger, data, action_config):
   logger.info("Log action for data: {}".format(data))
   return True
 
+# hint: do funkcji przekazuj tylko tą konfigurację, której potrzebuje, czyli byłoby w tym przypadku, tak:
+#
+# sms_conf = action_confg['send_sms']
+#
+# def send_sms(data, conf):
+# ...
+#
+# i wywołać:
+#
+# send_sms(data, sms_conf)
+#
+#
+# ewentualnie, gdy musisz/chcesz przekazać całość, to wtedy, zeby nie pisać
+# cały czas "action_config['send_sms']['costam'] przypisz to do zmienej i do niej się odwoływać:
+# sms_conf = action_config['send_sms']
+# sms_conf['costam']
 def send_sms(logger, data, action_config):
   if not action_config['send_sms']['enabled']:
     return False
@@ -25,6 +67,10 @@ def send_sms(logger, data, action_config):
   if 'message' in data:
     msg = data['message']
   else:
+    # hint: w formatowaniu możesz używać kluczy ze słownika:
+    #
+    #  msg = "{sensor_type} {board_desc} ...".foramt(**data)
+    #
     msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
             data['board_desc'], data['board_id'], data['sensor_data'])
 
@@ -67,6 +113,8 @@ def send_mail(logger, data, action_config):
           action_config['send_mail']['recipient'],
           action_config['send_mail']['subject'],
           msg)
+  # hint: jeżeli nie chcesz stawiać sobie smtp, to możesz np. użyć Mandrilla (http://mandrill.com/)
+  # tl;dr wysyłka e-maili po HTTP API
   try:
     s = smtplib.SMTP(action_config['send_mail']['host'], action_config['send_mail']['port'], timeout=5)
     s.starttls()
@@ -185,7 +233,10 @@ def create_logger(level, log_file=None):
 
 class mgmt_Thread(threading.Thread):
   def __init__(self, appdir):
+    # super(mgmt_Thread, self).__init__()
     threading.Thread.__init__(self)
+    # a to nie działa tak jak chcesz?
+    # self.name = 'mgmt'
     threading.current_thread().name = 'mgmt'
     self.daemon = True
 
@@ -235,6 +286,9 @@ class mgmt_Thread(threading.Thread):
         try:
           data = json.loads(data)
         except (ValueError) as e:
+          # hint: jak używasz loggera, to powinno się podstawianie wartości zostawić
+          # loggerowi, jeżeli będą jakieś błędy, to wtedy on sobie z nimi poradzi i nie wywali ci skryptu:
+          # logger.warning("Got exception %s while reading from socket", e)
           self.logger.warning('Got exception {} while reading from socket'.format(e))
           continue
         if 'action' in data:
@@ -243,6 +297,8 @@ class mgmt_Thread(threading.Thread):
             conn.send(json.dumps(STATUS))
           elif data['action'] == 'send' and 'data' in data:
             try:
+              # hint: .format() jest czytelniejszy:
+              # r_cmd = "{node_id}:{cmd}".format(node_id=data[...], cmd=data[...])
               r_cmd = str(data['data']['nodeid'])+":"+str(data['data']['cmd'])
               self.serial.write(r_cmd)
             except (IOError, ValueError, serial.serialutil.SerialException) as e:
@@ -343,7 +399,18 @@ class mgw_Thread(threading.Thread):
         s_data = self.serial.readline().strip()
         m = re_data.match(s_data)
         #{"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
+        #
+        # to może być: data['board_id'], data['sensor_type'], data['sensor_data'] = m.groups()
+        # doc: https://docs.python.org/2/library/re.html#re.MatchObject.groups
         data['board_id'], data['sensor_type'], data['sensor_data'] = [m.group(i) for i in range(1, 4)]
+
+        # regexpy mogą mieć nazwane grupy: (?P<nazwa>regex)
+        #
+        # re_data = re.compile('\[(?P<id>\d+)\]\[(?P<sensor>.+):(?P<data>.+)\]')
+        # m = re_data.match(s_match)
+        # m.groupdict() => (na przykład) {'data': '3.3', 'id': '10', 'sensor': 'voltage'}
+        #
+        # doc: https://docs.python.org/2/library/re.html#re.MatchObject.groupdict
       except (IOError, ValueError, serial.serialutil.SerialException) as e:
         self.logger.error('Got exception {} while reading from serial'.format(e))
         self.serial.close()
