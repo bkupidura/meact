@@ -22,7 +22,7 @@ def load_config(config_name):
 
 def write2socket(data, response = False):
   client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-  client.connect(conf['mgmt_socket'])
+  client.connect(app.config['appconfig']['mgmt_socket'])
   client.send(data)
   if (response):
     return client.recv(1024)
@@ -34,7 +34,7 @@ def after_request():
 @app.hook('before_request')
 def before_request():
   client_ip = bottle.request.environ['REMOTE_ADDR']
-  allowed = bool(netaddr.all_matching_cidrs(client_ip, conf['allowed_cidrs']))
+  allowed = bool(netaddr.all_matching_cidrs(client_ip, app.config['appconfig']['allowed_cidrs']))
   if not allowed:
     raise bottle.HTTPError(403, 'Forbidden')
 
@@ -46,7 +46,7 @@ def redirect2index():
 
 @app.route('/front/<filepath:path>')
 def static(filepath):
-  return bottle.static_file(filepath, root=conf['static_dir'])
+  return bottle.static_file(filepath, root=app.config['appconfig']['static_dir'])
 
 @app.route('/api/action/status')
 def get_action_status():
@@ -138,8 +138,9 @@ if __name__ == "__main__":
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
-  conf = load_config(args.dir+'/global.config.json')
-  plugin = bottle.ext.sqlite.Plugin(dbfile=conf['db'])
+  app.config['appconfig'] = load_config(args.dir+'/global.config.json')
+
+  plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)
 
-  app.run(host='0.0.0.0', port=8080, debug=conf['debug'])
+  app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'])

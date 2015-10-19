@@ -7,11 +7,11 @@
     "speed": 115200,
     "timeout": 20
   },
-  "msd":{
-    "cache_time": 60,
-    "failure_value": 300,
-    "failure_query": "SELECT board_id,last_update FROM (SELECT board_id,max(last_update) as last_update FROM last_metrics GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>?",
-    "failure_action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}]
+  "msd": {
+    "query": "SELECT board_id,last_update FROM (SELECT board_id,max(last_update) as last_update FROM last_metrics GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>300",
+    "action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+    "action_interval": 86400,
+    "loop_sleep": 60
   },
   "action_config": {
     "send_sms": {

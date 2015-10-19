@@ -2,7 +2,6 @@
     <head>
         <script src="jquery.min.js"></script>
         <script src="mustache.js"></script>
-        <!--        <script src="highcharts.js"></script> -->
         <script src="highstock.js"></script>
         <script src="exporting.js"></script>
         <!-- Latest compiled and minified CSS -->
@@ -29,13 +28,7 @@
                 <li role="presentation"><a href="#node" data-toggle="tab">Node</a></li>
                 <li class="dropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown">Graph<span class="caret"></span></a>
-                    <ul class="dropdown-menu" role="menu">
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Voltage</a></li>
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Temperature</a></li>
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Uptime</a></li>
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">FailedReport</a></li>
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">Motion</a></li>
-                        <li><a href="#graph" tabindex="-1" data-toggle="tab">RSSI</a></li>
+                    <ul class="dropdown-menu" id="dropdown-menu" role="menu">
                     </ul>
                 </li>
             </ul>
@@ -46,6 +39,7 @@
             </div>
         </div>
     </body>
+    <script src="graphs.js"></script>
     <script>
         api_endpoint = parent.location.protocol+'//'+window.location.hostname+':'+window.location.port+'/api';
 
@@ -79,8 +73,8 @@
                 chart.hideLoading();
             }); 
         }
-        jQuery["postJSON"] = function(url, data, callback ) {
-            if ( jQuery.isFunction( data ) ) {
+        jQuery["postJSON"] = function(url, data, callback) {
+            if (jQuery.isFunction(data)) {
                 callback = data;
                 data = undefined;
             }
@@ -108,10 +102,8 @@
     <script>
         $(document).on('ready', function() {
             $('.nav-tabs a').on('show.bs.tab', function(ev){
-                var what = $(ev.target).text().toLowerCase();
+                what = $(ev.target).text().toLowerCase();
                 var href = $(ev.target).attr("href");
-
-                var graphs = ['temperature', 'voltage', 'uptime', 'failedreport', 'motion', 'rssi'];
 
                 if ("refreshTimer" in window){
                     clearInterval(refreshTimer);
@@ -127,35 +119,15 @@
                         var rendered = Mustache.render(template, data);
                         $(href).html(rendered);
                     });
-                } else if (graphs.indexOf(what) >= 0){
-                    switch(what){
-                        case 'temperature':
-                            graph_detail = {chart_type: 'line', graph_title: 'Nodes temperature', y_axis_title: 'Temperature (C)', value_round: 1, what: what};
-                            break;
-                        case 'voltage':
-                            graph_detail = {chart_type: 'line', graph_title: 'Nodes voltage', y_axis_title: 'Voltage (V)', value_round: 2, what: what};
-                            break;
-                        case 'uptime':
-                            graph_detail = {chart_type: 'line', graph_title: 'Nodes uptime', y_axis_title: 'Uptime', value_round: 0, what: what};
-                            break;
-                        case 'failedreport':
-                            graph_detail = {chart_type: 'scatter', graph_title: 'Number of failed reports', y_axis_title: 'Failed reports', value_round: 0, what: what};
-                            break;
-                        case 'motion':
-                            graph_detail = {chart_type: 'scatter', graph_title: 'Detected motion', y_axis_title: 'Motion', value_round: 0, what: what};
-                            break;
-                        case 'rssi':
-                            graph_detail = {chart_type: 'line', graph_title: 'Nodes RSSI', y_axis_title: 'RSSI', value_round: 0, what: what};
-                            break;
-                    }
+                } else if (what in graphs){
                     $.postJSON(api_endpoint+'/graph/'+what, '{"last_available": 10}', function(data, status){
                         var chart_begin = new Date(new Date().setYear(new Date().getFullYear() - 2)).getTime();
                         $('#graph').highcharts('StockChart', {
                             chart: {
-                                type: graph_detail['chart_type'],
+                                type: graphs[what]['chart_type'],
                             },
                             title: {
-                                text: graph_detail['graph_title'],
+                                text: graphs[what]['graph_title'],
                             },
                             xAxis: {
                                 type: 'datetime',
@@ -203,7 +175,7 @@
                             tooltip: {
                                 formatter: function() {
                                     var s = Highcharts.dateFormat('%A, %d-%m-%Y %H:%M:%S',new Date(this.x));
-                                    var round = graph_detail['value_round'];
+                                    var round = graphs[what]['value_round'];
                                     s += '<br/>' + this.series.name + ': <b>' + this.y.toFixed(round) + '</b>';
                                     return s;
                                 },
@@ -211,14 +183,14 @@
                             },
                             yAxis: {
                                 title: {
-                                    text: graph_detail['y_axis_title'],
+                                    text: graphs[what]['y_axis_title'],
                                 },
                             },
                             legend: {
                                 enabled: true,
                             },
                             credits: {
-                                text: graph_detail['what'],
+                                text: what,
                             },
                             series: data
                         });
