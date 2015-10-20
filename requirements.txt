@@ -1,0 +1,7 @@
+argparse
+bottle
+bottle-sqlite
+netaddr
+pyserial
+requests
+urllib3

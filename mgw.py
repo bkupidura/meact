@@ -14,26 +14,25 @@ import argparse
 import requests
 import smtplib
 
-def log(logger, data, action_config):
-  logger.info("Log action for data: {}".format(data))
+def log(data, action_config):
+  LOG.info("Log action for '%s'", data)
   return True
 
-def send_sms(logger, data, action_config):
-  if not action_config['send_sms']['enabled']:
+def send_sms(data, action_config):
+  if not action_config.get('enabled'):
     return False
 
   if 'message' in data:
     msg = data['message']
   else:
-    msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
-            data['board_desc'], data['board_id'], data['sensor_data'])
+    msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
 
-  logger.debug('Sending SMS')
+  LOG.debug('Sending SMS')
 
-  url = action_config['send_sms']['endpoint']
-  params = {'username': action_config['send_sms']['user'],
-          'password': action_config['send_sms']['password'],
-          'msisdn': action_config['send_sms']['recipient'],
+  url = action_config['endpoint']
+  params = {'username': action_config['user'],
+          'password': action_config['password'],
+          'msisdn': action_config['recipient'],
           'message': msg}
 
   logging.getLogger("urllib3").setLevel(logging.CRITICAL)
@@ -41,63 +40,59 @@ def send_sms(logger, data, action_config):
     r = requests.get(url, params=params, timeout=5)
     r.raise_for_status()
   except (requests.HTTPError, requests.ConnectionError) as e:
-    logger.warning('Fail to send SMS: {}'.format(e))
+    LOG.warning("Got exception '%s' in send_sms", e)
     return False
 
   result = r.text.split('|')
   if result[0] != '0':
-    logger.warning('Fail to send SMS: {} {}'.format(result[0], result[1]))
+    LOG.warning("Fail in send_sms '%s' '%s'", result[0], result[1])
     return False
 
   return True
 
-def send_mail(logger, data, action_config):
-  if not action_config['send_mail']['enabled']:
+def send_mail(data, action_config):
+  if not action_config.get('enabled'):
     return False
 
   if 'message' in data:
     msg = data['message']
   else:
-    msg = '{} on board {} ({}) reports value {}'.format(data['sensor_type'],
-            data['board_desc'], data['board_id'], data['sensor_data'])
+    msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
 
-  logger.debug('Sending mail')
+  LOG.debug('Sending mail')
 
-  message = "From: {}\nTo: {}\nSubject: {}\n\n{}\n\n".format(action_config['send_mail']['sender'],
-          action_config['send_mail']['recipient'],
-          action_config['send_mail']['subject'],
-          msg)
+  message = "From: {sender}\nTo: {recipient}\nSubject: {subject}\n\n{msg}\n\n".format(msg=msg, **action_config)
   try:
-    s = smtplib.SMTP(action_config['send_mail']['host'], action_config['send_mail']['port'], timeout=5)
+    s = smtplib.SMTP(action_config['host'], action_config['port'], timeout=5)
     s.starttls()
-    s.login(action_config['send_mail']['user'], action_config['send_mail']['password'])
-    s.sendmail(action_config['send_mail']['sender'], action_config['send_mail']['recipient'], message)
+    s.login(action_config['user'], action_config['password'])
+    s.sendmail(action_config['sender'], action_config['recipient'], message)
     s.quit()
   except (socket.gaierror, socket.timeout, smtplib.SMTPAuthenticationError, smtplib.SMTPDataError) as e:
-    logger.warning('Fail to send mail: {}'.format(e))
+    LOG.warning("Got exception '%' in send_mail", e)
     return False
   else:
     return True
 
-def action_execute(logger, data, action, action_config):
+def action_execute(data, action, action_config):
   result = 0
   for a in action:
-    logger.debug('Action execute for: {}'.format(a))
-    if not eval(a['name'])(logger, data, action_config):
+    LOG.debug("Action execute '%s'", a)
+    if not eval(a['name'])(data, action_config.get(a['name'])):
       if 'failback' in a:
-        result += action_execute(logger, data, a['failback'], action_config)
+        result += action_execute(data, a['failback'], action_config)
     else:
       result += 1
   return result
 
-def action_helper(logger, data, action_details, action_config=None):
+def action_helper(data, action_details, action_config=None):
   action_details.setdefault('check_if_armed', True)
   action_details.setdefault('action_interval', 0)
   action_details.setdefault('threshold', 'lambda x: True')
   action_details.setdefault('fail_count', 0)
   action_details.setdefault('fail_interval', 600)
 
-  logger.debug('Action helper for data: {} action_details: {}'.format(data, action_details))
+  LOG.debug("Action helper '%s' '%s'", data, action_details)
   now = int(time.time())
 
   action_status.setdefault(data['board_id'], {})
@@ -119,12 +114,12 @@ def action_helper(logger, data, action_details, action_config=None):
   if (now - action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
     return
 
-  if action_execute(logger, data, action_details['action'], action_config):
+  if action_execute(data, action_details['action'], action_config):
     action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
-    raise KeyError('Config {} is missing'.format(config_name))
+    raise KeyError("Config '{}' is missing".format(config_name))
 
   with open(config_name) as json_config:
     config = json.load(json_config)
@@ -181,13 +176,10 @@ def create_logger(level, log_file=None):
   handler.setFormatter(formatter)
   logger.addHandler(handler)
 
-  return logger
-
 class mgmt_Thread(threading.Thread):
   def __init__(self, appdir):
-    threading.Thread.__init__(self)
-    threading.current_thread().name = 'mgmt'
-    self.daemon = True
+    super(mgmt_Thread, self).__init__()
+    self.name = 'mgmt'
 
     conf = load_config(appdir + '/global.config.json')
     board_map = load_config(appdir + '/boards.config.json')
@@ -197,10 +189,8 @@ class mgmt_Thread(threading.Thread):
     self.serial = serial.Serial(conf['serial']['device'],
             conf['serial']['speed'],
             timeout=conf['serial']['timeout'])
-    self.logger = create_logger(conf['logging']['level'],
-            conf['logging'].get('file'))
 
-    self.msd = failure_Thread(name='msd', logger=self.logger,
+    self.msd = failure_Thread(name='msd',
             loop_sleep=conf['msd']['loop_sleep'],
             db_file=conf['db_file'],
             action_interval=conf['msd']['action_interval'],
@@ -208,7 +198,7 @@ class mgmt_Thread(threading.Thread):
             action=conf['msd']['action'],
             board_map=board_map,
             action_config=conf['action_config']) #Missing sensor detector
-    self.mgw = mgw_Thread(logger=self.logger, ser=self.serial,
+    self.mgw = mgw_Thread(ser=self.serial,
             loop_sleep=conf['loop_sleep'],
             gateway_ping_time=conf['gateway_ping_time'],
             db_file=conf['db_file'],
@@ -217,7 +207,7 @@ class mgmt_Thread(threading.Thread):
             action_config=conf['action_config'])
 
   def run(self):
-    self.logger.info('Starting')
+    LOG.info('Starting')
 
     self.msd.start()
     self.mgw.start()
@@ -235,18 +225,18 @@ class mgmt_Thread(threading.Thread):
         try:
           data = json.loads(data)
         except (ValueError) as e:
-          self.logger.warning('Got exception {} while reading from socket'.format(e))
+          LOG.warning("Got exception '%s' in mgmt thread", e)
           continue
         if 'action' in data:
-          self.logger.info('Got {} on mgmt socket'.format(data))
+          LOG.info("Got '%s' on mgmt socket", data)
           if data['action'] == 'status':
             conn.send(json.dumps(STATUS))
           elif data['action'] == 'send' and 'data' in data:
             try:
-              r_cmd = str(data['data']['nodeid'])+":"+str(data['data']['cmd'])
+              r_cmd = "{nodeid}:{cmd}".format(**data['data'])
               self.serial.write(r_cmd)
             except (IOError, ValueError, serial.serialutil.SerialException) as e:
-              self.logger.error('Fail to send command {} to remote node'.format(r_cmd))
+              LOG.error("Got exception '%s' in mgmt thread", e)
           elif data['action'] == 'set' and 'data' in data:
             for key in data['data']:
               STATUS[key] = data['data'][key]
@@ -258,15 +248,14 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 class failure_Thread(threading.Thread):
-  def __init__(self, name, logger, loop_sleep, db_file, action_interval,
+  def __init__(self, name, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
-    threading.Thread.__init__(self)
+    super(failure_Thread, self).__init__()
     self.name = name
     self.daemon = True
     self.enabled = threading.Event()
     if STATUS[name+'_enabled']:
       self.enabled.set()
-    self.logger = logger
     self.loop_sleep = loop_sleep
     self.db_file = db_file
     self.action_interval = action_interval
@@ -286,10 +275,10 @@ class failure_Thread(threading.Thread):
               board_id, now - value)
 
       data['message'] = message
-      action_helper(self.logger, data, action_details, self.action_config)
+      action_helper(data, action_details, self.action_config)
 
   def run(self):
-    self.logger.info('Starting')
+    LOG.info('Starting')
     self.db = connect_db(self.db_file)
     while True:
       self.enabled.wait()
@@ -301,15 +290,14 @@ class failure_Thread(threading.Thread):
       time.sleep(self.loop_sleep)
 
 class mgw_Thread(threading.Thread):
-  def __init__(self, logger, ser, loop_sleep, gateway_ping_time,
+  def __init__(self, ser, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
-    threading.Thread.__init__(self)
+    super(mgw_Thread, self).__init__()
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
     if STATUS["mgw_enabled"]:
       self.enabled.set()
-    self.logger = logger
     self.serial = ser
     self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
@@ -324,18 +312,16 @@ class mgw_Thread(threading.Thread):
       self.serial.write('1:1')
       time.sleep(1)
     except (IOError, ValueError, serial.serialutil.SerialException) as e:
-      self.logger.error('Failed to get measure from gateway: {}'.format(e))
+      LOG.error("Got exception '%' in ping_gateway", e)
     else:
       self.last_gw_ping = int(time.time())
 
   def run(self):
-    self.logger.info('Starting')
+    LOG.info('Starting')
     self.db = connect_db(self.db_file)
 
     #[ID][metric:value] / [10][voltage:3.3]
-    re_data = re.compile('\[(\d+)\]\[(.+):(.+)\]')
-
-    data = {}
+    re_data = re.compile('\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
     while True:
       self.enabled.wait()
@@ -343,47 +329,47 @@ class mgw_Thread(threading.Thread):
         s_data = self.serial.readline().strip()
         m = re_data.match(s_data)
         #{"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
-        data['board_id'], data['sensor_type'], data['sensor_data'] = [m.group(i) for i in range(1, 4)]
+        data = m.groupdict()
       except (IOError, ValueError, serial.serialutil.SerialException) as e:
-        self.logger.error('Got exception {} while reading from serial'.format(e))
+        LOG.error("Got exception '%' in mgw thread", e)
         self.serial.close()
         time.sleep(self.loop_sleep)
         try:
           self.serial.open()
         except (OSError) as e:
-          self.logger.warning('Failed to open serial')
+          LOG.warning('Failed to open serial')
         continue
       except (AttributeError) as e:
         if len(s_data) > 0:
-          self.logger.debug('> {}'.format(s_data))
+          LOG.debug('> %s', s_data)
         continue
       finally:
         if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
           self.ping_gateway()
 
-      self.logger.debug('Got data from serial {}'.format(data))
+      LOG.debug("Got data from serial '%s'", data)
 
       try:
         self.db.execute("INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
                 (data['board_id'], data['sensor_type'], data['sensor_data']))
         self.db.commit()
       except (sqlite3.IntegrityError) as e:
-        self.logger.error('Integrity error {}'.format(e))
+        LOG.error("Got exception '%' in mgw thread", e)
       except (sqlite3.OperationalError) as e:
         time.sleep(1+random.random())
         try:
           self.db.commit()
         except (sqlite3.OperationalError) as e:
-          self.logger.error('Failed to commit data to DB');
+          LOG.error("Got exception '%' in mgw thread", e);
 
       try:
         action_details = self.sensor_map[data['sensor_type']]
         action_details['action']
       except (KeyError) as e:
-        self.logger.debug('Missing sensor_map/action for sensor_type {}'.format(data['sensor_type']))
+        LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
       else:
         data['board_desc'] = self.board_map[str(data['board_id'])]
-        action_helper(self.logger, data, action_details, self.action_config)
+        action_helper(data, action_details, self.action_config)
 
 STATUS = {
   "armed": 1,
@@ -392,10 +378,15 @@ STATUS = {
 }
 action_status = {}
 
+LOG = logging.getLogger(__name__)
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Moteino gateway')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
+  conf = load_config(args.dir + '/global.config.json')
+  create_logger(conf['logging']['level'])
+
   mgmt = mgmt_Thread(appdir=args.dir)
-  mgmt.run()
+  mgmt.start()
