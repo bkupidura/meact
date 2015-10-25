@@ -1,10 +1,18 @@
 {
   "voltage": {
     "action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
-    "check_if_armed": 0,
+    "check_if_armed": {"default": 0},
     "action_interval": 360,
     "threshold": "lambda x: float(x)<3.2",
     "fail_count": 2,
     "fail_interval": 300
+  },
+  "motion": {
+    "action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+    "check_if_armed": {"default": 1, "except": ["12"]},
+    "action_interval": 360,
+    "threshold": "lambda x: int(x)==1",
+    "fail_count": 0,
+    "fail_interval": 0
   }
 }

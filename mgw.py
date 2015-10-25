@@ -86,7 +86,8 @@ def action_execute(data, action, action_config):
   return result
 
 def action_helper(data, action_details, action_config=None):
-  action_details.setdefault('check_if_armed', True)
+  action_details.setdefault('check_if_armed', {'default': True})
+  action_details['check_if_armed'].setdefault('except', [])
   action_details.setdefault('action_interval', 0)
   action_details.setdefault('threshold', 'lambda x: True')
   action_details.setdefault('fail_count', 0)
@@ -101,8 +102,9 @@ def action_helper(data, action_details, action_config=None):
   action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
     [i for i in action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
 
-  if (action_details['check_if_armed']) and (not STATUS['armed']):
-    return
+  if (bool(action_details['check_if_armed']['default']) ^ bool(data['board_id'] in action_details['check_if_armed']['except'])):
+    if (not STATUS['armed']):
+      return
 
   if not eval(action_details['threshold'])(data['sensor_data']):
     return
@@ -228,7 +230,7 @@ class mgmt_Thread(threading.Thread):
           LOG.warning("Got exception '%s' in mgmt thread", e)
           continue
         if 'action' in data:
-          LOG.info("Got '%s' on mgmt socket", data)
+          LOG.debug("Got '%s' on mgmt socket", data)
           if data['action'] == 'status':
             conn.send(json.dumps(STATUS))
           elif data['action'] == 'send' and 'data' in data:
@@ -268,7 +270,7 @@ class failure_Thread(threading.Thread):
   def handle_failed(self, board_id, value):
     now = int(time.time())
     data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
-    action_details = {'check_if_armed': False, 'action_interval': self.action_interval, 'action': self.action}
+    action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
 
     if self.name == 'msd':
       message = 'No update from {} ({}) since {} seconds'.format(self.board_map[board_id],

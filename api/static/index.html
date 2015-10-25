@@ -209,7 +209,7 @@
           {{/if}}
         {{/each}}
     </script>
-    <script id="statusTemplate" type="x-handlebars-mustache">
+    <script id="statusTemplate" type="x-handlebars-template">
         {{#each this}}
           {{#if this}}
             <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_status('{{@key}}')">{{@key}}: {{this}}</span></h3>
