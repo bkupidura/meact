@@ -4,7 +4,6 @@ import json
 import time
 import os
 import netaddr
-from datetime import datetime
 import bottle
 import bottle.ext.sqlite
 import argparse
@@ -59,11 +58,15 @@ def set_action_status():
     data = json.dumps(bottle.request.json)
     write2socket('{{"action": "set", "data": {}}}'.format(data))
 
-@app.route('/api/action/invert_armed')
-def get_action_invert_armed():
-  status = json.loads(get_action_status())
-  inverted = not int(status['armed'])
-  write2socket('{{"action": "set", "data": {{"armed": "{}"}}}}'.format(int(inverted)))
+@app.route('/api/action/invert_status', method = ['POST'])
+def action_invert_status():
+  if (bottle.request.json):
+    status = json.loads(get_action_status())
+    name = bottle.request.json.get('name')
+    cur_status = status.get(name)
+    if cur_status is not None:
+      inverted = not int(cur_status)
+      write2socket('{{"action": "set", "data": {{"{}": {}}}}}'.format(name, int(inverted)))
 
 @app.route('/api/node', method = ['GET', 'POST'])
 @app.route('/api/node/', method = ['GET', 'POST'])

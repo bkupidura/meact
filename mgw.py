@@ -39,7 +39,7 @@ def send_sms(data, action_config):
   try:
     r = requests.get(url, params=params, timeout=5)
     r.raise_for_status()
-  except (requests.HTTPError, requests.ConnectionError) as e:
+  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
     LOG.warning("Got exception '%s' in send_sms", e)
     return False
 
@@ -240,9 +240,9 @@ class mgmt_Thread(threading.Thread):
           elif data['action'] == 'set' and 'data' in data:
             for key in data['data']:
               STATUS[key] = data['data'][key]
-              if key == 'mgw_enabled':
+              if key == 'mgw':
                 self.mgw.enabled.set() if data['data'][key] else self.mgw.enabled.clear()
-              elif key == 'msd_enabled':
+              elif key == 'msd':
                 self.msd.enabled.set() if data['data'][key] else self.msd.enabled.clear()
 
       conn.close()
@@ -254,7 +254,7 @@ class failure_Thread(threading.Thread):
     self.name = name
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS[name+'_enabled']:
+    if STATUS[name]:
       self.enabled.set()
     self.loop_sleep = loop_sleep
     self.db_file = db_file
@@ -296,7 +296,7 @@ class mgw_Thread(threading.Thread):
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS["mgw_enabled"]:
+    if STATUS["mgw"]:
       self.enabled.set()
     self.serial = ser
     self.loop_sleep = loop_sleep
@@ -373,8 +373,9 @@ class mgw_Thread(threading.Thread):
 
 STATUS = {
   "armed": 1,
-  "msd_enabled": 1,
-  "mgw_enabled": 1,
+  "msd": 1,
+  "mgw": 1,
+  "fence": 1,
 }
 action_status = {}
 

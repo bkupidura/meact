@@ -1,0 +1,8 @@
+{
+  "geo_api": "https://example.com/geo.php",
+  "geo_user": "user",
+  "geo_pass": "pass",
+  "geo_devices": ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"],
+  "loop_time": 60,
+  "mgw_api": "http://localhost:8080/api"
+}

@@ -1,7 +1,7 @@
 <html>
     <head>
         <script src="jquery.min.js"></script>
-        <script src="mustache.js"></script>
+        <script src="handlebars.js"></script>
         <script src="highstock.js"></script>
         <script src="exporting.js"></script>
         <!-- Latest compiled and minified CSS -->
@@ -48,11 +48,11 @@
             $link.parent().removeClass('active');
             $(href).tab('show');
         }
-        function invert_armed(){
-            msg = 'Change armed status?';
+        function invert_status(what){
+            msg = 'Change '+what+' status?';
             if (confirm(msg)){
-                $.getJSON(api_endpoint+'/action/invert_armed');
-                refresh_tab(document.getElementById('status-tab'));
+                $.postJSON(api_endpoint+'/action/invert_status', '{"name": "'+what+'"}');
+                setTimeout(refresh_tab(document.getElementById('status-tab')), 500);
             }
             return false;
         }
@@ -114,9 +114,9 @@
                     if (what == 'status') url = api_endpoint+'/action/status';
                     if (what == 'node') url = api_endpoint+'/node';
                     $.getJSON(url).done(function(data){
-                        var template = $('#' + what + 'Template').html();
-                        Mustache.parse(template);
-                        var rendered = Mustache.render(template, data);
+                        var source = $('#' + what + 'Template').html();
+                        var template = Handlebars.compile(source);
+                        var rendered = template(data);
                         $(href).html(rendered);
                     });
                 } else if (what in graphs){
@@ -199,15 +199,23 @@
             });
         });
     </script>
-    <script id="nodeTemplate" type="x-tmpl-mustache">
-        {{#.}}
-        <h3><span class="label label-default">{{desc}} ({{name}})</span></h3>
-        {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
-        {{/.}}
+    <script id="nodeTemplate" type="x-handlebars-template">
+        {{#each this}}
+          {{#if data}}
+            <h3><span class="label label-default">{{desc}} ({{name}})</span></h3>
+            {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
+          {{else}}
+            <h3><span class="label label-danger">{{desc}} ({{name}})</span></h3>
+          {{/if}}
+        {{/each}}
     </script>
-    <script id="statusTemplate" type="x-tmpl-mustache">
-        <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_armed()">Armed: {{armed}}</a></span></h3>
-        <h3><span class="label label-default">MGW Enabled: {{mgw_enabled}}</span></h3>
-        <h3><span class="label label-default">MSD Enabled: {{msd_enabled}}</span></h3>
+    <script id="statusTemplate" type="x-handlebars-mustache">
+        {{#each this}}
+          {{#if this}}
+            <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_status('{{@key}}')">{{@key}}: {{this}}</span></h3>
+          {{else}}
+            <h3><span style="cursor: pointer;" class="label label-warning" onclick="invert_status('{{@key}}')">{{@key}}: {{this}}</span></h3>
+          {{/if}}
+        {{/each}}
     </script>
 </html>
