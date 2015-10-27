@@ -15,3 +15,11 @@ body {
 .pill-content > .active {
     height: auto;       /* let the content decide it  */
 } /* bootstrap hack end */
+
+.status-wrapper{
+  width: 10%;
+}
+
+.status-wrapper .label {
+  display:block;
+}
