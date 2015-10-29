@@ -96,11 +96,11 @@ def action_helper(data, action_details, action_config=None):
   LOG.debug("Action helper '%s' '%s'", data, action_details)
   now = int(time.time())
 
-  action_status.setdefault(data['board_id'], {})
-  action_status[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
+  ACTION_STATUS.setdefault(data['board_id'], {})
+  ACTION_STATUS[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
 
-  action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
-    [i for i in action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+  ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] = \
+    [i for i in ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
 
   if (bool(action_details['check_if_armed']['default']) ^ bool(data['board_id'] in action_details['check_if_armed']['except'])):
     if (not STATUS['armed']):
@@ -109,15 +109,15 @@ def action_helper(data, action_details, action_config=None):
   if not eval(action_details['threshold'])(data['sensor_data']):
     return
 
-  if len(action_status[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
-    action_status[data['board_id']][data['sensor_type']]['last_fail'].append(now)
+  if len(ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
+    ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'].append(now)
     return
 
-  if (now - action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
+  if (now - ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
     return
 
   if action_execute(data, action_details['action'], action_config):
-    action_status[data['board_id']][data['sensor_type']]['last_action'] = now
+    ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
@@ -379,7 +379,7 @@ STATUS = {
   "mgw": 1,
   "fence": 1,
 }
-action_status = {}
+ACTION_STATUS = {}
 
 LOG = logging.getLogger(__name__)
 
