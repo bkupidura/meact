@@ -18,6 +18,7 @@ def log(data, action_config):
   LOG.info("Log action for '%s'", data)
   return True
 
+
 def send_sms(data, action_config):
   if not action_config.get('enabled'):
     return False
@@ -49,6 +50,7 @@ def send_sms(data, action_config):
     return False
 
   return True
+
 
 def send_mail(data, action_config):
   if not action_config.get('enabled'):
@@ -85,6 +87,22 @@ def action_execute(data, action, action_config):
       result += 1
   return result
 
+
+class ActionDetailsAdapter(dict):
+  """Adapter for action details
+
+  Provides helpers and functions that allows
+  to easily work on action details
+  """
+  def should_check_if_armed(self, board_id):
+    """Should action be checked for given board?"""
+    return (
+      self['check_if_armed']['default']
+      ^
+      (board_id in self['check_if_armed']['except'])
+    )
+
+
 def action_helper(data, action_details, action_config=None):
   action_details.setdefault('check_if_armed', {'default': True})
   action_details['check_if_armed'].setdefault('except', [])
@@ -92,6 +110,8 @@ def action_helper(data, action_details, action_config=None):
   action_details.setdefault('threshold', 'lambda x: True')
   action_details.setdefault('fail_count', 0)
   action_details.setdefault('fail_interval', 600)
+
+  action_details = ActionDetailsAdapter(action_details)
 
   LOG.debug("Action helper '%s' '%s'", data, action_details)
   now = int(time.time())
@@ -102,9 +122,8 @@ def action_helper(data, action_details, action_config=None):
   ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] = \
     [i for i in ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
 
-  if (bool(action_details['check_if_armed']['default']) ^ bool(data['board_id'] in action_details['check_if_armed']['except'])):
-    if (not STATUS['armed']):
-      return
+  if action_details.should_check_if_armed(data['board_id']) and not STATUS['armed']:
+    return
 
   if not eval(action_details['threshold'])(data['sensor_data']):
     return
@@ -119,6 +138,7 @@ def action_helper(data, action_details, action_config=None):
   if action_execute(data, action_details['action'], action_config):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
+
 def load_config(config_name):
   if not os.path.isfile(config_name):
     raise KeyError("Config '{}' is missing".format(config_name))
@@ -128,9 +148,11 @@ def load_config(config_name):
 
   return config
 
+
 def connect_db(db_file):
   db = sqlite3.connect(db_file)
   return db
+
 
 def create_db(db_file, appdir, create_sensor_table=False):
   board_map = load_config(appdir + '/boards.config.json')
@@ -165,6 +187,7 @@ def create_db(db_file, appdir, create_sensor_table=False):
     SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id
     and sensor_type==new.sensor_type; END''')
 
+
 def create_logger(level, log_file=None):
   logger = logging.getLogger()
   logger.setLevel(level)
@@ -177,6 +200,7 @@ def create_logger(level, log_file=None):
 
   handler.setFormatter(formatter)
   logger.addHandler(handler)
+
 
 class mgmt_Thread(threading.Thread):
   def __init__(self, appdir):
@@ -249,6 +273,7 @@ class mgmt_Thread(threading.Thread):
 
       conn.close()
 
+
 class failure_Thread(threading.Thread):
   def __init__(self, name, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
@@ -290,6 +315,7 @@ class failure_Thread(threading.Thread):
         self.handle_failed(board_id, value)
 
       time.sleep(self.loop_sleep)
+
 
 class mgw_Thread(threading.Thread):
   def __init__(self, ser, loop_sleep, gateway_ping_time,
@@ -372,6 +398,7 @@ class mgw_Thread(threading.Thread):
       else:
         data['board_desc'] = self.board_map[str(data['board_id'])]
         action_helper(data, action_details, self.action_config)
+
 
 STATUS = {
   "armed": 1,
