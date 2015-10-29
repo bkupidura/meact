@@ -37,11 +37,11 @@ def api_request(url, method='GET', params=None, data=None, auth=None, headers=No
     req.raise_for_status()
   except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
     LOG.error('Fail to connect to url %s', e)
-    return None
+    return {}
   try:
     data = json.loads(req.text)
   except (ValueError) as e:
-    return None
+    return {}
   return data
 
 def set_armed(mgw_api, status=0):
@@ -53,7 +53,7 @@ def set_armed(mgw_api, status=0):
 def check_action(data, allowed_devices, armed, mgw_api):
   status = {
     'enter': 0,
-    'leave': 0,
+    'exit': 0,
   }
   for device in data:
     action = data[device]['action']
@@ -66,7 +66,7 @@ def check_action(data, allowed_devices, armed, mgw_api):
   if (armed == 1) and (status['enter'] > 0):
     LOG.info('Disarm alarm')
     set_armed(mgw_api, 0)
-  elif (armed == 0) and (status['leave'] == len(allowed_devices)):
+  elif (armed == 0) and (status['exit'] == len(allowed_devices)):
     LOG.info('Arm alarm')
     set_armed(mgw_api, 1)
 

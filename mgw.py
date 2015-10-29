@@ -413,9 +413,16 @@ LOG = logging.getLogger(__name__)
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Moteino gateway')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
+  parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
 
   conf = load_config(args.dir + '/global.config.json')
+
+  if args.create_db or args.sync_db_desc:
+    create_db(conf['db_file'], args.dir, args.create_db)
+    sys.exit(0)
+
   create_logger(conf['logging']['level'])
 
   mgmt = mgmt_Thread(appdir=args.dir)

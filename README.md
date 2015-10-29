@@ -27,17 +27,8 @@ MGW contains a few sub services:
 * cp boards.config.json.example boards.config.json
 * cp sensors.config.json.example sensors.config.json
 * modify all json config files 
-* create mgw DB
-
-> python
-
-> import mgw
-
-> create_db('mgw.db', '/dir/with/mgw', True)
-
-> exit()
-
-* start mgw services, you can use supervisor
+* python mgw.py --dir /dir/with/mgw --create-db
+* start mgw services (use supervisor if needed)
 
 > python mgw.py --dir /dir/with/mgw
 
