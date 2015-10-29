@@ -92,6 +92,7 @@ def send_mail(data, action_config):
   else:
     return True
 
+
 def action_execute(data, action, action_config):
   result = 0
   for a in action:
@@ -155,38 +156,74 @@ def connect_db(db_file):
   return db
 
 
-def create_db(db_file, appdir, create_sensor_table=False):
+# NOTE(prmtl): this could be also loaded from file to save
+BOARDS_TABLE_SQL = """
+DROP TABLE IF EXISTS board_desc;
+CREATE TABLE board_desc (
+  board_id TEXT PRIMARY KEY,
+  board_desc TEXT
+);
+"""
+
+
+METRICS_TABLE_SQL = """
+DROP TABLE IF EXISTS metrics;
+CREATE TABLE metrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  board_id TEXT, sensor_type TEXT,
+  last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')),
+  data TEXT DEFAULT NULL
+);
+
+DROP INDEX IF EXISTS idx_board_id;
+CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data);
+"""
+
+
+LAST_METRICS_TABLE_SQL = """
+DROP TABLE IF EXISTS last_metrics;
+CREATE TABLE last_metrics (
+  board_id TEXT,
+  sensor_type TEXT,
+  last_update TIMESTAMP,
+  data TEXT
+);
+DROP TRIGGER IF EXISTS insert_metric;
+CREATE TRIGGER insert_metric
+  INSERT ON metrics WHEN NOT EXISTS (
+    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+  )
+BEGIN
+  INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.data);
+END;
+
+DROP TRIGGER IF EXISTS update_metric;
+CREATE TRIGGER update_metric
+  INSERT ON metrics WHEN EXISTS (
+    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+  )
+BEGIN
+  UPDATE last_metrics SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id and sensor_type==new.sensor_type;
+END;
+"""
+
+
+def create_db(db_file, appdir, create_metrics_table=False):
   board_map = load_config(appdir + '/boards.config.json')
   db = connect_db(db_file)
-  db.execute("DROP TABLE IF EXISTS board_desc");
-  db.execute('''CREATE TABLE board_desc(board_id TEXT PRIMARY KEY, board_desc TEXT)''');
 
-  for key in board_map:
-    db.execute("INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
-      (key, board_map[key]))
+  db.executescript(BOARDS_TABLE_SQL)
+
+  db.executemany(
+    "INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
+    board_map.iteritems()
+  )
   db.commit()
 
-  if (create_sensor_table):
-    db.execute("DROP TABLE IF EXISTS metrics")
-    db.execute('''CREATE TABLE metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, board_id TEXT, sensor_type TEXT,
-      last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')), data TEXT DEFAULT NULL)''')
+  if create_metrics_table:
+    db.executescript(METRICS_TABLE_SQL)
 
-    db.execute("DROP INDEX IF EXISTS idx_board_id")
-    db.execute("CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data)")
-
-  db.execute("DROP TABLE IF EXISTS last_metrics")
-  db.execute("CREATE TABLE last_metrics (board_id TEXT, sensor_type TEXT, last_update TIMESTAMP, data TEXT)")
-
-  db.execute("DROP TRIGGER IF EXISTS insert_metric")
-  db.execute('''CREATE TRIGGER insert_metric INSERT ON metrics WHEN NOT EXISTS(SELECT 1 FROM last_metrics
-    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN INSERT into last_metrics
-    values(new.board_id, new.sensor_type, new.last_update, new.data); END''')
-
-  db.execute("DROP TRIGGER IF EXISTS update_metric")
-  db.execute('''CREATE TRIGGER update_metric INSERT ON metrics WHEN EXISTS(SELECT 1 FROM last_metrics
-    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN UPDATE last_metrics
-    SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id
-    and sensor_type==new.sensor_type; END''')
+  db.executescript(LAST_METRICS_TABLE_SQL)
 
 
 def create_logger(level, log_file=None):
@@ -408,7 +445,7 @@ class mgw_Thread(threading.Thread):
       sensor_type = sensor_data['sensor_type']
 
       sensor_config = self.sensor_map.get(sensor_type)
-      if not sensor_config:
+      if not sensor_config or not sensor_config.get('action'):
         LOG.warning("Missing sensor_map/action for sensor_type '%s'", sensor_type)
         continue
 
