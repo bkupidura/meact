@@ -71,7 +71,7 @@ def send_mail(data, action_config):
     s.sendmail(action_config['sender'], action_config['recipient'], message)
     s.quit()
   except (socket.gaierror, socket.timeout, smtplib.SMTPAuthenticationError, smtplib.SMTPDataError) as e:
-    LOG.warning("Got exception '%' in send_mail", e)
+    LOG.warning("Got exception '%s' in send_mail", e)
     return False
   else:
     return True
