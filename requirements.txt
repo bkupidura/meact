@@ -5,3 +5,6 @@ netaddr
 pyserial
 requests
 urllib3
+
+# tests
+pytest

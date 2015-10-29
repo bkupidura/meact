@@ -1,4 +1,5 @@
 import copy
+import os
 import sys
 
 import pytest
@@ -6,8 +7,9 @@ import pytest
 # NOTE(prmtl): hack to allow imports of mgw.py
 # it should be replaced by a real life file but do we
 # really care about it? :)
-sys.path.insert(0, '../')
-from mgw import mgw
+parent_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, parent_dir)
+import mgw
 
 
 default_action = {
