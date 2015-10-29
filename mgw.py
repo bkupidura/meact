@@ -14,6 +14,22 @@ import argparse
 import requests
 import smtplib
 
+
+class ActionDetailsAdapter(dict):
+  """Adapter for action details
+
+  Provides helpers and functions that allows
+  to easily work on action details
+  """
+  def should_check_if_armed(self, board_id):
+    """Should action be checked for given board?"""
+    return (
+      self['check_if_armed']['default']
+      ^
+      (board_id in self['check_if_armed']['except'])
+    )
+
+
 def log(data, action_config):
   LOG.info("Log action for '%s'", data)
   return True
@@ -86,21 +102,6 @@ def action_execute(data, action, action_config):
     else:
       result += 1
   return result
-
-
-class ActionDetailsAdapter(dict):
-  """Adapter for action details
-
-  Provides helpers and functions that allows
-  to easily work on action details
-  """
-  def should_check_if_armed(self, board_id):
-    """Should action be checked for given board?"""
-    return (
-      self['check_if_armed']['default']
-      ^
-      (board_id in self['check_if_armed']['except'])
-    )
 
 
 def action_helper(data, action_details, action_config=None):
@@ -318,6 +319,11 @@ class failure_Thread(threading.Thread):
 
 
 class mgw_Thread(threading.Thread):
+
+  # [ID][metric:value] / [10][voltage:3.3]
+  _re_sensor_data = re.compile(
+    '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
+
   def __init__(self, ser, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
     super(mgw_Thread, self).__init__()
@@ -344,60 +350,71 @@ class mgw_Thread(threading.Thread):
     else:
       self.last_gw_ping = int(time.time())
 
+  def _read_sensors_data(self):
+    data = {}
+    try:
+      s_data = self.serial.readline().strip()
+      m = self._re_sensor_data.match(s_data)
+      # {"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
+      data = m.groupdict()
+    except (IOError, ValueError, serial.serialutil.SerialException) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+      self.serial.close()
+      time.sleep(self.loop_sleep)
+      try:
+        self.serial.open()
+      except (OSError) as e:
+        LOG.warning('Failed to open serial')
+    except (AttributeError) as e:
+      if len(s_data) > 0:
+        LOG.debug('> %s', s_data)
+    finally:
+      if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
+        self.ping_gateway()
+
+    return data
+
+  def _save_sensors_data(self, data):
+    try:
+      self.db.execute(
+        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
+        (data['board_id'], data['sensor_type'], data['sensor_data'])
+      )
+      self.db.commit()
+    except (sqlite3.IntegrityError) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+    except (sqlite3.OperationalError) as e:
+      time.sleep(1 + random.random())
+      try:
+        self.db.commit()
+      except (sqlite3.OperationalError) as e:
+        LOG.error("Got exception '%' in mgw thread", e)
+
   def run(self):
     LOG.info('Starting')
     self.db = connect_db(self.db_file)
 
-    #[ID][metric:value] / [10][voltage:3.3]
-    re_data = re.compile('\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
-
     while True:
       self.enabled.wait()
-      try:
-        s_data = self.serial.readline().strip()
-        m = re_data.match(s_data)
-        #{"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
-        data = m.groupdict()
-      except (IOError, ValueError, serial.serialutil.SerialException) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
-        self.serial.close()
-        time.sleep(self.loop_sleep)
-        try:
-          self.serial.open()
-        except (OSError) as e:
-          LOG.warning('Failed to open serial')
+
+      sensor_data = self._read_sensors_data()
+      if not sensor_data:
         continue
-      except (AttributeError) as e:
-        if len(s_data) > 0:
-          LOG.debug('> %s', s_data)
+
+      LOG.debug("Got data from serial '%s'", sensor_data)
+
+      self._save_sensors_data(sensor_data)
+
+      sensor_type = sensor_data['sensor_type']
+
+      sensor_config = self.sensor_map.get(sensor_type)
+      if not sensor_config:
+        LOG.warning("Missing sensor_map/action for sensor_type '%s'", sensor_type)
         continue
-      finally:
-        if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
-          self.ping_gateway()
 
-      LOG.debug("Got data from serial '%s'", data)
-
-      try:
-        self.db.execute("INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
-                (data['board_id'], data['sensor_type'], data['sensor_data']))
-        self.db.commit()
-      except (sqlite3.IntegrityError) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
-      except (sqlite3.OperationalError) as e:
-        time.sleep(1+random.random())
-        try:
-          self.db.commit()
-        except (sqlite3.OperationalError) as e:
-          LOG.error("Got exception '%' in mgw thread", e);
-
-      try:
-        action_details = self.sensor_map[data['sensor_type']]
-        action_details['action']
-      except (KeyError) as e:
-        LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
-      else:
-        data['board_desc'] = self.board_map[str(data['board_id'])]
-        action_helper(data, action_details, self.action_config)
+      board_id = str(sensor_data['board_id'])
+      sensor_data['board_desc'] = self.board_map[board_id]
+      action_helper(sensor_data, sensor_config, self.action_config)
 
 
 STATUS = {
@@ -406,6 +423,7 @@ STATUS = {
   "mgw": 1,
   "fence": 1,
 }
+
 ACTION_STATUS = {}
 
 LOG = logging.getLogger(__name__)
