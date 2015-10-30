@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
 import serial
 import time
 import json
@@ -13,6 +13,22 @@ import re
 import argparse
 import requests
 import smtplib
+
+
+class ActionDetailsAdapter(dict):
+  """Adapter for action details
+
+  Provides helpers and functions that allows
+  to easily work on action details
+  """
+  def should_check_if_armed(self, board_id):
+    """Should action be checked for given board?"""
+    return (
+      self['check_if_armed']['default']
+      ^
+      (board_id in self['check_if_armed']['except'])
+    )
+
 
 def log(data, action_config):
   LOG.info("Log action for '%s'", data)
@@ -71,10 +87,11 @@ def send_mail(data, action_config):
     s.sendmail(action_config['sender'], action_config['recipient'], message)
     s.quit()
   except (socket.gaierror, socket.timeout, smtplib.SMTPAuthenticationError, smtplib.SMTPDataError) as e:
-    LOG.warning("Got exception '%' in send_mail", e)
+    LOG.warning("Got exception '%s' in send_mail", e)
     return False
   else:
     return True
+
 
 def action_execute(data, action, action_config):
   result = 0
@@ -86,21 +103,6 @@ def action_execute(data, action, action_config):
     else:
       result += 1
   return result
-
-
-class ActionDetailsAdapter(dict):
-  """Adapter for action details
-
-  Provides helpers and functions that allows
-  to easily work on action details
-  """
-  def should_check_if_armed(self, board_id):
-    """Should action be checked for given board?"""
-    return (
-      self['check_if_armed']['default']
-      ^
-      (board_id in self['check_if_armed']['except'])
-    )
 
 
 def action_helper(data, action_details, action_config=None):
@@ -154,38 +156,74 @@ def connect_db(db_file):
   return db
 
 
-def create_db(db_file, appdir, create_sensor_table=False):
+# NOTE(prmtl): this could be also loaded from file to save
+BOARDS_TABLE_SQL = """
+DROP TABLE IF EXISTS board_desc;
+CREATE TABLE board_desc (
+  board_id TEXT PRIMARY KEY,
+  board_desc TEXT
+);
+"""
+
+
+METRICS_TABLE_SQL = """
+DROP TABLE IF EXISTS metrics;
+CREATE TABLE metrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  board_id TEXT, sensor_type TEXT,
+  last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')),
+  data TEXT DEFAULT NULL
+);
+
+DROP INDEX IF EXISTS idx_board_id;
+CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data);
+"""
+
+
+LAST_METRICS_TABLE_SQL = """
+DROP TABLE IF EXISTS last_metrics;
+CREATE TABLE last_metrics (
+  board_id TEXT,
+  sensor_type TEXT,
+  last_update TIMESTAMP,
+  data TEXT
+);
+DROP TRIGGER IF EXISTS insert_metric;
+CREATE TRIGGER insert_metric
+  INSERT ON metrics WHEN NOT EXISTS (
+    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+  )
+BEGIN
+  INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.data);
+END;
+
+DROP TRIGGER IF EXISTS update_metric;
+CREATE TRIGGER update_metric
+  INSERT ON metrics WHEN EXISTS (
+    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+  )
+BEGIN
+  UPDATE last_metrics SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id and sensor_type==new.sensor_type;
+END;
+"""
+
+
+def create_db(db_file, appdir, create_metrics_table=False):
   board_map = load_config(appdir + '/boards.config.json')
   db = connect_db(db_file)
-  db.execute("DROP TABLE IF EXISTS board_desc");
-  db.execute('''CREATE TABLE board_desc(board_id TEXT PRIMARY KEY, board_desc TEXT)''');
 
-  for key in board_map:
-    db.execute("INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
-      (key, board_map[key]))
+  db.executescript(BOARDS_TABLE_SQL)
+
+  db.executemany(
+    "INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
+    board_map.iteritems()
+  )
   db.commit()
 
-  if (create_sensor_table):
-    db.execute("DROP TABLE IF EXISTS metrics")
-    db.execute('''CREATE TABLE metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, board_id TEXT, sensor_type TEXT,
-      last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')), data TEXT DEFAULT NULL)''')
+  if create_metrics_table:
+    db.executescript(METRICS_TABLE_SQL)
 
-    db.execute("DROP INDEX IF EXISTS idx_board_id")
-    db.execute("CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data)")
-
-  db.execute("DROP TABLE IF EXISTS last_metrics")
-  db.execute("CREATE TABLE last_metrics (board_id TEXT, sensor_type TEXT, last_update TIMESTAMP, data TEXT)")
-
-  db.execute("DROP TRIGGER IF EXISTS insert_metric")
-  db.execute('''CREATE TRIGGER insert_metric INSERT ON metrics WHEN NOT EXISTS(SELECT 1 FROM last_metrics
-    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN INSERT into last_metrics
-    values(new.board_id, new.sensor_type, new.last_update, new.data); END''')
-
-  db.execute("DROP TRIGGER IF EXISTS update_metric")
-  db.execute('''CREATE TRIGGER update_metric INSERT ON metrics WHEN EXISTS(SELECT 1 FROM last_metrics
-    WHERE board_id=new.board_id and sensor_type=new.sensor_type) BEGIN UPDATE last_metrics
-    SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id
-    and sensor_type==new.sensor_type; END''')
+  db.executescript(LAST_METRICS_TABLE_SQL)
 
 
 def create_logger(level, log_file=None):
@@ -318,6 +356,11 @@ class failure_Thread(threading.Thread):
 
 
 class mgw_Thread(threading.Thread):
+
+  # [ID][metric:value] / [10][voltage:3.3]
+  _re_sensor_data = re.compile(
+    '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
+
   def __init__(self, ser, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
     super(mgw_Thread, self).__init__()
@@ -344,60 +387,71 @@ class mgw_Thread(threading.Thread):
     else:
       self.last_gw_ping = int(time.time())
 
+  def _read_sensors_data(self):
+    data = {}
+    try:
+      s_data = self.serial.readline().strip()
+      m = self._re_sensor_data.match(s_data)
+      # {"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
+      data = m.groupdict()
+    except (IOError, ValueError, serial.serialutil.SerialException) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+      self.serial.close()
+      time.sleep(self.loop_sleep)
+      try:
+        self.serial.open()
+      except (OSError) as e:
+        LOG.warning('Failed to open serial')
+    except (AttributeError) as e:
+      if len(s_data) > 0:
+        LOG.debug('> %s', s_data)
+    finally:
+      if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
+        self.ping_gateway()
+
+    return data
+
+  def _save_sensors_data(self, data):
+    try:
+      self.db.execute(
+        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
+        (data['board_id'], data['sensor_type'], data['sensor_data'])
+      )
+      self.db.commit()
+    except (sqlite3.IntegrityError) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+    except (sqlite3.OperationalError) as e:
+      time.sleep(1 + random.random())
+      try:
+        self.db.commit()
+      except (sqlite3.OperationalError) as e:
+        LOG.error("Got exception '%' in mgw thread", e)
+
   def run(self):
     LOG.info('Starting')
     self.db = connect_db(self.db_file)
 
-    #[ID][metric:value] / [10][voltage:3.3]
-    re_data = re.compile('\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
-
     while True:
       self.enabled.wait()
-      try:
-        s_data = self.serial.readline().strip()
-        m = re_data.match(s_data)
-        #{"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
-        data = m.groupdict()
-      except (IOError, ValueError, serial.serialutil.SerialException) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
-        self.serial.close()
-        time.sleep(self.loop_sleep)
-        try:
-          self.serial.open()
-        except (OSError) as e:
-          LOG.warning('Failed to open serial')
+
+      sensor_data = self._read_sensors_data()
+      if not sensor_data:
         continue
-      except (AttributeError) as e:
-        if len(s_data) > 0:
-          LOG.debug('> %s', s_data)
+
+      LOG.debug("Got data from serial '%s'", sensor_data)
+
+      self._save_sensors_data(sensor_data)
+
+      sensor_type = sensor_data['sensor_type']
+
+      sensor_config = self.sensor_map.get(sensor_type)
+      if not sensor_config or not sensor_config.get('action'):
+        LOG.warning("Missing sensor_map/action for sensor_type '%s'", sensor_type)
         continue
-      finally:
-        if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
-          self.ping_gateway()
 
-      LOG.debug("Got data from serial '%s'", data)
-
-      try:
-        self.db.execute("INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
-                (data['board_id'], data['sensor_type'], data['sensor_data']))
-        self.db.commit()
-      except (sqlite3.IntegrityError) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
-      except (sqlite3.OperationalError) as e:
-        time.sleep(1+random.random())
-        try:
-          self.db.commit()
-        except (sqlite3.OperationalError) as e:
-          LOG.error("Got exception '%' in mgw thread", e);
-
-      try:
-        action_details = self.sensor_map[data['sensor_type']]
-        action_details['action']
-      except (KeyError) as e:
-        LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
-      else:
-        data['board_desc'] = self.board_map[str(data['board_id'])]
-        action_helper(data, action_details, self.action_config)
+      board_id = str(sensor_data['board_id'])
+      sensor_data['board_desc'] = self.board_map[board_id]
+      action_helper(sensor_data, sensor_config, self.action_config)
 
 
 STATUS = {
@@ -406,6 +460,7 @@ STATUS = {
   "mgw": 1,
   "fence": 1,
 }
+
 ACTION_STATUS = {}
 
 LOG = logging.getLogger(__name__)
