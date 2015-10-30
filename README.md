@@ -20,21 +20,34 @@ MGW contains a few sub services:
 * twitter bootstrap
 
 ## Instalation:
-* git clone https://github.com/bkupidura/mgw.git
-* cd mgw
-* pip install -r requirements.txt
-* cp global.config.json.example global.config.json
-* cp boards.config.json.example boards.config.json
-* cp sensors.config.json.example sensors.config.json
-* modify all json config files 
-* python mgw.py --dir /dir/with/mgw --create-db
-* start mgw services (use supervisor if needed)
 
-> python mgw.py --dir /dir/with/mgw
+```
+$ git clone https://github.com/bkupidura/mgw.git
+$ cd mgw
+$ pip install .
 
-> python api.py --dir /dir/with/mgw/api
+```
 
-> python fence.py --dir /dir/with/mgw/fence
+Copy and modify configuration files:
+
+```
+$ cp global.config.json.example global.config.json
+$ cp boards.config.json.example boards.config.json
+$ cp sensors.config.json.example sensors.config.json
+```
+
+Run mgw and create DB (if not created before)
+
+```
+moteino-mgw --dir /dir/with/mgw/config --create-db
+```
+
+Start other MGW services (use supervisor if needed):
+
+```
+$ moteino-api --dir /dir/with/mgw/api/config
+$ moteino-fence --dir /dir/with/mgw/fence/config
+```
 
 ### global.config.json
 Fields:
@@ -68,6 +81,23 @@ Fields:
 
 > [program:mgw-fence]
 > command=/usr/bin/python /root/mgw/main/fence/fence.py --dir /root/mgw/main/fence
+
+## Running tests
+
+MGW has a bunch of tests that helps in development. Tests are run by `pytest` with
+`tox` as automation tool.
+
+First, install `tox`:
+
+```
+$ pip install tox
+```
+
+Then run `tox` (it will prepare virtual environment and install all requirements):
+
+```
+$ tox
+```
 
 ## MGW details
 MGW expect on serial input in format:
