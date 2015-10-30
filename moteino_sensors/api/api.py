@@ -136,7 +136,8 @@ def get_graph(db, graph_type = 'uptime'):
 
   return json.dumps(output)
 
-if __name__ == "__main__":
+
+def main():
   parser = argparse.ArgumentParser(description='Moteino gateway API')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
@@ -147,3 +148,7 @@ if __name__ == "__main__":
   app.install(plugin)
 
   app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'])
+
+
+if __name__ == "__main__":
+  main()

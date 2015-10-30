@@ -465,7 +465,8 @@ ACTION_STATUS = {}
 
 LOG = logging.getLogger(__name__)
 
-if __name__ == "__main__":
+
+def main():
   parser = argparse.ArgumentParser(description='Moteino gateway')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
@@ -482,3 +483,7 @@ if __name__ == "__main__":
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()
+
+
+if __name__ == "__main__":
+  main()

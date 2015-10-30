@@ -72,7 +72,8 @@ def check_action(data, allowed_devices, armed, mgw_api):
 
 LOG = logging.getLogger(__name__)
 
-if __name__ == "__main__":
+
+def main():
   parser = argparse.ArgumentParser(description='Fence')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
@@ -91,3 +92,7 @@ if __name__ == "__main__":
         set_armed(conf['mgw_api'], 1)
 
     time.sleep(conf['loop_time'])
+
+
+if __name__ == "__main__":
+  main()
