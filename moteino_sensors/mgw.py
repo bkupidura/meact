@@ -14,6 +14,8 @@ import argparse
 import requests
 import smtplib
 
+from moteino_sensors import utils
+
 
 class ActionDetailsAdapter(dict):
   """Adapter for action details
@@ -141,16 +143,6 @@ def action_helper(data, action_details, action_config=None):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
 
-def load_config(config_name):
-  if not os.path.isfile(config_name):
-    raise KeyError("Config '{}' is missing".format(config_name))
-
-  with open(config_name) as json_config:
-    config = json.load(json_config)
-
-  return config
-
-
 def connect_db(db_file):
   db = sqlite3.connect(db_file)
   return db
@@ -209,7 +201,7 @@ END;
 
 
 def create_db(db_file, appdir, create_metrics_table=False):
-  board_map = load_config(appdir + '/boards.config.json')
+  board_map = utils.load_config(appdir + '/boards.config.json')
   db = connect_db(db_file)
 
   db.executescript(BOARDS_TABLE_SQL)
@@ -245,9 +237,9 @@ class mgmt_Thread(threading.Thread):
     super(mgmt_Thread, self).__init__()
     self.name = 'mgmt'
 
-    conf = load_config(appdir + '/global.config.json')
-    board_map = load_config(appdir + '/boards.config.json')
-    sensor_map = load_config(appdir + '/sensors.config.json')
+    conf = utils.load_config(appdir + '/global.config.json')
+    board_map = utils.load_config(appdir + '/boards.config.json')
+    sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
     self.serial = serial.Serial(conf['serial']['device'],
@@ -473,7 +465,7 @@ def main():
   parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
 
-  conf = load_config(args.dir + '/global.config.json')
+  conf = utils.load_config(args.dir + '/global.config.json')
 
   if args.create_db or args.sync_db_desc:
     create_db(conf['db_file'], args.dir, args.create_db)

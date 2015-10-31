@@ -2,22 +2,15 @@
 import socket
 import json
 import time
-import os
 import netaddr
 import bottle
 import bottle.ext.sqlite
 import argparse
 
+from moteino_sensors import utils
+
+
 app = bottle.Bottle()
-
-def load_config(config_name):
-  if not os.path.isfile(config_name):
-    raise KeyError('Config {} is missing'.format(config_name))
-
-  with open(config_name) as json_config:
-    config = json.load(json_config)
-
-  return config
 
 def write2socket(data, response = False):
   client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -142,7 +135,7 @@ def main():
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
-  app.config['appconfig'] = load_config(args.dir+'/global.config.json')
+  app.config['appconfig'] = utils.load_config(args.dir+'/global.config.json')
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)
