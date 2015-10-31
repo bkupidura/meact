@@ -12,16 +12,19 @@ from moteino_sensors import utils
 
 app = bottle.Bottle()
 
-def write2socket(data, response = False):
+
+def write2socket(data, response=False):
   client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
   client.connect(app.config['appconfig']['mgmt_socket'])
   client.send(data)
   if (response):
     return client.recv(1024)
 
+
 @app.hook('after_request')
 def after_request():
   bottle.response.headers['Access-Control-Allow-Origin'] = '*'
+
 
 @app.hook('before_request')
 def before_request():
@@ -30,28 +33,33 @@ def before_request():
   if not allowed:
     raise bottle.HTTPError(403, 'Forbidden')
 
+
 @app.route('/')
 @app.route('/front')
 @app.route('/front/')
 def redirect2index():
   bottle.redirect('/front/index.html')
 
+
 @app.route('/front/<filepath:path>')
 def static(filepath):
   return bottle.static_file(filepath, root=app.config['appconfig']['static_dir'])
 
+
 @app.route('/api/action/status')
 def get_action_status():
-  output = write2socket('{"action": "status"}', response = True)
+  output = write2socket('{"action": "status"}', response=True)
   return output
 
-@app.route('/api/action/status', method = ['POST'])
+
+@app.route('/api/action/status', method=['POST'])
 def set_action_status():
   if (bottle.request.json):
     data = json.dumps(bottle.request.json)
     write2socket('{{"action": "set", "data": {}}}'.format(data))
 
-@app.route('/api/action/invert_status', method = ['POST'])
+
+@app.route('/api/action/invert_status', method=['POST'])
 def action_invert_status():
   if (bottle.request.json):
     status = json.loads(get_action_status())
@@ -61,12 +69,13 @@ def action_invert_status():
       inverted = not int(cur_status)
       write2socket('{{"action": "set", "data": {{"{}": {}}}}}'.format(name, int(inverted)))
 
-@app.route('/api/node', method = ['GET', 'POST'])
-@app.route('/api/node/', method = ['GET', 'POST'])
-@app.route('/api/node/<node_id:int>', method = ['GET', 'POST'])
-def get_nodes(db, node_id = False):
+
+@app.route('/api/node', method=['GET', 'POST'])
+@app.route('/api/node/', method=['GET', 'POST'])
+@app.route('/api/node/<node_id:int>', method=['GET', 'POST'])
+def get_nodes(db, node_id=False):
   now = int(time.time())
-  start = now - 60*60*1
+  start = now - 60 * 60 * 1
   end = now
 
   if (bottle.request.json):
@@ -87,20 +96,21 @@ def get_nodes(db, node_id = False):
     for metric in metrics:
       o_metric.append(tuple(metric))
     output.append({"name": node, "desc": desc[node], "data": o_metric})
- 
+
   return json.dumps(output)
 
-@app.route('/api/graph/<graph_type>', method = ['GET', 'POST'])
-def get_graph(db, graph_type = 'uptime'):
+
+@app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
+def get_graph(db, graph_type='uptime'):
   now = int(time.time())
-  start = now - 60*60*24
+  start = now - 60 * 60 * 24
   end = now
   last_available = 0
 
   if (bottle.request.json):
     start = bottle.request.json.get('start', start)
     end = bottle.request.json.get('end', end)
-    last_available = bottle.request.json.get('last_available', last_available);
+    last_available = bottle.request.json.get('last_available', last_available)
 
   graph_type = str(graph_type)
 
@@ -122,7 +132,7 @@ def get_graph(db, graph_type = 'uptime'):
         (graph_type, node_id, last_available)).fetchall()
 
     for metric in metrics:
-      tmp = ((metric[0]*1000), float(metric[1]))
+      tmp = ((metric[0] * 1000), float(metric[1]))
       o_metric.append(tmp)
 
     output.append({"name": desc[node_id], "data": o_metric})
@@ -135,7 +145,7 @@ def main():
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
-  app.config['appconfig'] = utils.load_config(args.dir+'/global.config.json')
+  app.config['appconfig'] = utils.load_config(args.dir + '/global.config.json')
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)
