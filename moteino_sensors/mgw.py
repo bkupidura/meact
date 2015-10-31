@@ -242,25 +242,53 @@ class mgmt_Thread(threading.Thread):
     sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
-    self.serial = serial.Serial(conf['serial']['device'],
-            conf['serial']['speed'],
-            timeout=conf['serial']['timeout'])
+    self.serial = serial.Serial(
+      conf['serial']['device'],
+      conf['serial']['speed'],
+      timeout=conf['serial']['timeout']
+    )
 
-    self.msd = failure_Thread(name='msd',
-            loop_sleep=conf['msd']['loop_sleep'],
-            db_file=conf['db_file'],
-            action_interval=conf['msd']['action_interval'],
-            query=conf['msd']['query'],
-            action=conf['msd']['action'],
-            board_map=board_map,
-            action_config=conf['action_config']) #Missing sensor detector
-    self.mgw = mgw_Thread(ser=self.serial,
-            loop_sleep=conf['loop_sleep'],
-            gateway_ping_time=conf['gateway_ping_time'],
-            db_file=conf['db_file'],
-            board_map=board_map,
-            sensor_map=sensor_map,
-            action_config=conf['action_config'])
+    # Missing sensor detector thread
+    self.msd = failure_Thread(
+      name='msd',
+      loop_sleep=conf['msd']['loop_sleep'],
+      db_file=conf['db_file'],
+      action_interval=conf['msd']['action_interval'],
+      query=conf['msd']['query'],
+      action=conf['msd']['action'],
+      board_map=board_map,
+      action_config=conf['action_config'])
+
+    self.mgw = mgw_Thread(
+      ser=self.serial,
+      loop_sleep=conf['loop_sleep'],
+      gateway_ping_time=conf['gateway_ping_time'],
+      db_file=conf['db_file'],
+      board_map=board_map,
+      sensor_map=sensor_map,
+      action_config=conf['action_config'])
+
+  def handle_action(self, data):
+    if 'action' not in data:
+      LOG.debug('No action to handle')
+
+    if data['action'] == 'status':
+      return STATUS
+
+    if data['action'] == 'send' and 'data' in data:
+      try:
+        r_cmd = "{nodeid}:{cmd}".format(**data['data'])
+        self.serial.write(r_cmd)
+      except (IOError, ValueError, serial.serialutil.SerialException) as e:
+        LOG.error("Got exception '%s' in mgmt thread", e)
+
+    if data['action'] == 'set' and 'data' in data:
+      STATUS.update(data['data'])
+
+      if 'mgw' in data['data']:
+        self.mgw.enabled.set() if data['data']['mgw'] else self.mgw.enabled.clear()
+      if 'msd' in data['data']:
+        self.msd.enabled.set() if data['data']['msd'] else self.msd.enabled.clear()
 
   def run(self):
     LOG.info('Starting')
@@ -271,35 +299,30 @@ class mgmt_Thread(threading.Thread):
     if os.path.exists(self.socket):
       os.remove(self.socket)
 
+    # TODO(prmtl): write a socket server class that will abstract this?
     self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     self.server.bind(self.socket)
     self.server.listen(1)
+
     while True:
+      # TODO(prmtl): check if we can do it onece
       conn, addr = self.server.accept()
       data = conn.recv(1024)
-      if data:
-        try:
-          data = json.loads(data)
-        except (ValueError) as e:
-          LOG.warning("Got exception '%s' in mgmt thread", e)
-          continue
-        if 'action' in data:
-          LOG.debug("Got '%s' on mgmt socket", data)
-          if data['action'] == 'status':
-            conn.send(json.dumps(STATUS))
-          elif data['action'] == 'send' and 'data' in data:
-            try:
-              r_cmd = "{nodeid}:{cmd}".format(**data['data'])
-              self.serial.write(r_cmd)
-            except (IOError, ValueError, serial.serialutil.SerialException) as e:
-              LOG.error("Got exception '%s' in mgmt thread", e)
-          elif data['action'] == 'set' and 'data' in data:
-            for key in data['data']:
-              STATUS[key] = data['data'][key]
-              if key == 'mgw':
-                self.mgw.enabled.set() if data['data'][key] else self.mgw.enabled.clear()
-              elif key == 'msd':
-                self.msd.enabled.set() if data['data'][key] else self.msd.enabled.clear()
+
+      LOG.debug("Got '%s' on mgmt socket", data)
+
+      if not data:
+        continue
+
+      try:
+        data = json.loads(data)
+      except (ValueError) as e:
+        LOG.warning("Cannot decode recieved data in mgmt thread: %s", e)
+        continue
+
+      response = self.handle_action(data)
+      if response:
+        conn.send(json.dumps(response))
 
       conn.close()
 
