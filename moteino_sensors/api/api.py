@@ -14,10 +14,13 @@ app = bottle.Bottle()
 
 
 def write2socket(data, response=False):
+  data = json.dumps(data)
+
   client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
   client.connect(app.config['appconfig']['mgmt_socket'])
   client.send(data)
-  if (response):
+
+  if response:
     return client.recv(1024)
 
 
@@ -48,15 +51,18 @@ def static(filepath):
 
 @app.route('/api/action/status')
 def get_action_status():
-  output = write2socket('{"action": "status"}', response=True)
+  output = write2socket({"action": "status"}, response=True)
   return output
 
 
 @app.route('/api/action/status', method=['POST'])
 def set_action_status():
-  if (bottle.request.json):
-    data = json.dumps(bottle.request.json)
-    write2socket('{{"action": "set", "data": {}}}'.format(data))
+  data = bottle.request.json
+  if data:
+    write2socket({
+      "action": "set",
+      "data": data
+    })
 
 
 @app.route('/api/action/invert_status', method=['POST'])
@@ -67,7 +73,12 @@ def action_invert_status():
     cur_status = status.get(name)
     if cur_status is not None:
       inverted = not int(cur_status)
-      write2socket('{{"action": "set", "data": {{"{}": {}}}}}'.format(name, int(inverted)))
+      write2socket({
+        "action": "set",
+        "data": {
+          name: int(inverted)
+        }
+      })
 
 
 @app.route('/api/node', method=['GET', 'POST'])
@@ -97,7 +108,7 @@ def get_nodes(db, node_id=False):
       o_metric.append(tuple(metric))
     output.append({"name": node, "desc": desc[node], "data": o_metric})
 
-  return json.dumps(output)
+  return output
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
@@ -137,7 +148,7 @@ def get_graph(db, graph_type='uptime'):
 
     output.append({"name": desc[node_id], "data": o_metric})
 
-  return json.dumps(output)
+  return output
 
 
 def main():
