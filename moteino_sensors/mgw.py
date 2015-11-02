@@ -461,7 +461,7 @@ class mgw_Thread(threading.Thread):
 
       sensor_config = self.sensor_map.get(sensor_type)
       if not sensor_config or not sensor_config.get('action'):
-        LOG.warning("Missing sensor_map/action for sensor_type '%s'", sensor_type)
+        LOG.debug("Missing sensor_map/action for sensor_type '%s'", sensor_type)
         continue
 
       board_id = str(sensor_data['board_id'])
