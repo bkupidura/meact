@@ -36,10 +36,10 @@ $ cp boards.config.json.example boards.config.json
 $ cp sensors.config.json.example sensors.config.json
 ```
 
-Run mgw and create DB (if not created before)
+Run gateway and create DB (if not created before)
 
 ```
-moteino-mgw --dir /dir/with/mgw/config --create-db
+moteino-gateway --dir /dir/with/gateway/config --create-db
 ```
 
 Start other MGW services (use supervisor if needed):
@@ -74,7 +74,7 @@ Fields:
 
 ### Supervisor
 > [program:mgw]
-> command=/usr/bin/python /root/mgw/main/mgw.py --dir /root/mgw/main
+> command=/usr/bin/python /root/mgw/main/gateway.py --dir /root/mgw/main
 
 > [program:mgw-api]
 > command=/usr/bin/python /root/mgw/main/api/api.py --dir /root/mgw/main/api

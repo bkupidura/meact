@@ -4,13 +4,7 @@ import sys
 
 import pytest
 
-# NOTE(prmtl): hack to allow imports of mgw.py
-# it should be replaced by a real life file but do we
-# really care about it? :)
-parent_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.insert(0, parent_dir)
-import mgw
-
+from moteino_sensors import gateway
 
 default_action = {
   'check_if_armed': {
@@ -68,6 +62,6 @@ def test_should_check_if_armed(check_if_armed, expected):
   action_details = copy.deepcopy(default_action)
   action_details['check_if_armed'] = check_if_armed
 
-  ada = mgw.ActionDetailsAdapter(action_details)
+  ada = gateway.ActionDetailsAdapter(action_details)
 
   assert ada.should_check_if_armed(board_id) == expected
