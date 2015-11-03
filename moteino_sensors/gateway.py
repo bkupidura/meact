@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-import serial
-import time
-import json
-import sqlite3
-import threading
-import random
-import logging
-import sys
-import os
-import socket
-import re
 import argparse
-import requests
+import json
+import logging
+import os
+import random
+import re
 import smtplib
+import socket
+import sqlite3
+import sys
+import threading
+import time
+
+import requests
+import serial
 
 from moteino_sensors import utils
 
