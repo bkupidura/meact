@@ -1,26 +1,11 @@
 #!/usr/bin/env python
 import requests
-import sys
 import json
 import time
 import logging
 import argparse
 
 from moteino_sensors import utils
-
-
-def create_logger(level, log_file=None):
-  logger = logging.getLogger()
-  logger.setLevel(level)
-  formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-
-  if log_file:
-    handler = logging.FileHandler(log_file)
-  else:
-    handler = logging.StreamHandler(sys.stdout)
-
-  handler.setFormatter(formatter)
-  logger.addHandler(handler)
 
 def api_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False):
   logging.getLogger("urllib3").setLevel(logging.CRITICAL)
@@ -72,7 +57,7 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
-  create_logger(logging.INFO)
+  utils.create_logger(logging.INFO)
 
   LOG.info('Starting')
   while True:

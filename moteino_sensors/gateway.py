@@ -218,20 +218,6 @@ def create_db(db_file, appdir, create_metrics_table=False):
   db.executescript(LAST_METRICS_TABLE_SQL)
 
 
-def create_logger(level, log_file=None):
-  logger = logging.getLogger()
-  logger.setLevel(level)
-  formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
-
-  if log_file:
-    handler = logging.FileHandler(log_file)
-  else:
-    handler = logging.StreamHandler(sys.stdout)
-
-  handler.setFormatter(formatter)
-  logger.addHandler(handler)
-
-
 class mgmt_Thread(threading.Thread):
   def __init__(self, appdir):
     super(mgmt_Thread, self).__init__()
@@ -494,7 +480,7 @@ def main():
     create_db(conf['db_file'], args.dir, args.create_db)
     sys.exit(0)
 
-  create_logger(conf['logging']['level'])
+  utils.create_logger(conf['logging']['level'])
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()
