@@ -3,8 +3,8 @@ MGW is responsible for handling metric reported by Moteino boards (http://lowpow
 It reads input from serial console and perform various actions.
 
 MGW contains a few sub services:
-* MGW - main daemon resposible for reading serial and executing actions.
-* API - JSON API to talk to MGW via local unix socket.
+* Gateway - main daemon resposible for reading serial and executing actions.
+* API - JSON API to talk to Gateway via local unix socket.
 * Fence - script which handle 'armed' status via API (it use external geofancing api to make a decision).
 
 ## Hardware:
@@ -40,6 +40,7 @@ Run gateway and create DB (if not created before)
 
 ```
 moteino-gateway --dir /dir/with/gateway/config --create-db
+moteino-gateway --dir /dir/with/gateway/config
 ```
 
 Start other MGW services (use supervisor if needed):
@@ -74,13 +75,13 @@ Fields:
 
 ### Supervisor
 > [program:mgw]
-> command=/usr/bin/python /root/mgw/main/gateway.py --dir /root/mgw/main
+> command=/usr/local/bin/moteino-gateway --dir /root/mgw/main
 
 > [program:mgw-api]
-> command=/usr/bin/python /root/mgw/main/api/api.py --dir /root/mgw/main/api
+> command=/usr/local/bin/moteino-api --dir /root/mgw/main/api
 
 > [program:mgw-fence]
-> command=/usr/bin/python /root/mgw/main/fence/fence.py --dir /root/mgw/main/fence
+> command=/usr/local/bin/moteino-fence --dir /root/mgw/main/fence
 
 ## Running tests
 
