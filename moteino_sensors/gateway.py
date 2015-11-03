@@ -106,8 +106,7 @@ class mgmt_Thread(threading.Thread):
     )
 
     # Missing sensor detector thread
-    self.msd = failure_Thread(
-      name='msd',
+    self.msd = msd_Thread(
       loop_sleep=conf['msd']['loop_sleep'],
       db_file=conf['db_file'],
       action_interval=conf['msd']['action_interval'],
@@ -184,14 +183,14 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 
-class failure_Thread(threading.Thread):
-  def __init__(self, name, loop_sleep, db_file, action_interval,
+class msd_Thread(threading.Thread):
+  def __init__(self, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
-    super(failure_Thread, self).__init__()
-    self.name = name
+    super(msd_Thread, self).__init__()
+    self.name = 'msd'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS[name]:
+    if STATUS[self.name]:
       self.enabled.set()
     self.loop_sleep = loop_sleep
     self.db_file = db_file
@@ -207,19 +206,17 @@ class failure_Thread(threading.Thread):
     data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
     action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
 
-    if self.name == 'msd':
-      message = 'No update from {} ({}) since {} seconds'.format(self.board_map[board_id],
-              board_id, now - value)
+    message = 'No update from {} ({}) since {} seconds'.format(
+      self.board_map[board_id], board_id, now - value)
 
-      data['message'] = message
-      action_helper(data, action_details, self.action_config)
+    data['message'] = message
+    action_helper(data, action_details, self.action_config)
 
   def run(self):
     LOG.info('Starting')
     self.db = database.connect(self.db_file)
     while True:
       self.enabled.wait()
-      now = int(time.time())
 
       for board_id, value in self.db.execute(self.query):
         self.handle_failed(board_id, value)
@@ -239,7 +236,7 @@ class mgw_Thread(threading.Thread):
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS["mgw"]:
+    if STATUS[self.name]:
       self.enabled.set()
     self.serial = ser
     self.loop_sleep = loop_sleep
