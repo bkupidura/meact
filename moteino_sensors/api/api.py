@@ -108,7 +108,7 @@ def get_nodes(db, node_id=False):
       o_metric.append(tuple(metric))
     output.append({"name": node, "desc": desc[node], "data": o_metric})
 
-  return output
+  return json.dumps(output)
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
@@ -148,7 +148,7 @@ def get_graph(db, graph_type='uptime'):
 
     output.append({"name": desc[node_id], "data": o_metric})
 
-  return output
+  return json.dumps(output)
 
 
 def main():
