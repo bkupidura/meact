@@ -14,6 +14,8 @@ import argparse
 import requests
 import smtplib
 
+from moteino_sensors import utils
+
 
 class ActionDetailsAdapter(dict):
   """Adapter for action details
@@ -141,16 +143,6 @@ def action_helper(data, action_details, action_config=None):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
 
-def load_config(config_name):
-  if not os.path.isfile(config_name):
-    raise KeyError("Config '{}' is missing".format(config_name))
-
-  with open(config_name) as json_config:
-    config = json.load(json_config)
-
-  return config
-
-
 def connect_db(db_file):
   db = sqlite3.connect(db_file)
   return db
@@ -209,7 +201,7 @@ END;
 
 
 def create_db(db_file, appdir, create_metrics_table=False):
-  board_map = load_config(appdir + '/boards.config.json')
+  board_map = utils.load_config(appdir + '/boards.config.json')
   db = connect_db(db_file)
 
   db.executescript(BOARDS_TABLE_SQL)
@@ -245,30 +237,58 @@ class mgmt_Thread(threading.Thread):
     super(mgmt_Thread, self).__init__()
     self.name = 'mgmt'
 
-    conf = load_config(appdir + '/global.config.json')
-    board_map = load_config(appdir + '/boards.config.json')
-    sensor_map = load_config(appdir + '/sensors.config.json')
+    conf = utils.load_config(appdir + '/global.config.json')
+    board_map = utils.load_config(appdir + '/boards.config.json')
+    sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
-    self.serial = serial.Serial(conf['serial']['device'],
-            conf['serial']['speed'],
-            timeout=conf['serial']['timeout'])
+    self.serial = serial.Serial(
+      conf['serial']['device'],
+      conf['serial']['speed'],
+      timeout=conf['serial']['timeout']
+    )
 
-    self.msd = failure_Thread(name='msd',
-            loop_sleep=conf['msd']['loop_sleep'],
-            db_file=conf['db_file'],
-            action_interval=conf['msd']['action_interval'],
-            query=conf['msd']['query'],
-            action=conf['msd']['action'],
-            board_map=board_map,
-            action_config=conf['action_config']) #Missing sensor detector
-    self.mgw = mgw_Thread(ser=self.serial,
-            loop_sleep=conf['loop_sleep'],
-            gateway_ping_time=conf['gateway_ping_time'],
-            db_file=conf['db_file'],
-            board_map=board_map,
-            sensor_map=sensor_map,
-            action_config=conf['action_config'])
+    # Missing sensor detector thread
+    self.msd = failure_Thread(
+      name='msd',
+      loop_sleep=conf['msd']['loop_sleep'],
+      db_file=conf['db_file'],
+      action_interval=conf['msd']['action_interval'],
+      query=conf['msd']['query'],
+      action=conf['msd']['action'],
+      board_map=board_map,
+      action_config=conf['action_config'])
+
+    self.mgw = mgw_Thread(
+      ser=self.serial,
+      loop_sleep=conf['loop_sleep'],
+      gateway_ping_time=conf['gateway_ping_time'],
+      db_file=conf['db_file'],
+      board_map=board_map,
+      sensor_map=sensor_map,
+      action_config=conf['action_config'])
+
+  def handle_action(self, data):
+    if 'action' not in data:
+      LOG.debug('No action to handle')
+
+    if data['action'] == 'status':
+      return STATUS
+
+    if data['action'] == 'send' and 'data' in data:
+      try:
+        r_cmd = "{nodeid}:{cmd}".format(**data['data'])
+        self.serial.write(r_cmd)
+      except (IOError, ValueError, serial.serialutil.SerialException) as e:
+        LOG.error("Got exception '%s' in mgmt thread", e)
+
+    if data['action'] == 'set' and 'data' in data:
+      STATUS.update(data['data'])
+
+      if 'mgw' in data['data']:
+        self.mgw.enabled.set() if data['data']['mgw'] else self.mgw.enabled.clear()
+      if 'msd' in data['data']:
+        self.msd.enabled.set() if data['data']['msd'] else self.msd.enabled.clear()
 
   def run(self):
     LOG.info('Starting')
@@ -279,35 +299,30 @@ class mgmt_Thread(threading.Thread):
     if os.path.exists(self.socket):
       os.remove(self.socket)
 
+    # TODO(prmtl): write a socket server class that will abstract this?
     self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     self.server.bind(self.socket)
     self.server.listen(1)
+
     while True:
+      # TODO(prmtl): check if we can do it onece
       conn, addr = self.server.accept()
       data = conn.recv(1024)
-      if data:
-        try:
-          data = json.loads(data)
-        except (ValueError) as e:
-          LOG.warning("Got exception '%s' in mgmt thread", e)
-          continue
-        if 'action' in data:
-          LOG.debug("Got '%s' on mgmt socket", data)
-          if data['action'] == 'status':
-            conn.send(json.dumps(STATUS))
-          elif data['action'] == 'send' and 'data' in data:
-            try:
-              r_cmd = "{nodeid}:{cmd}".format(**data['data'])
-              self.serial.write(r_cmd)
-            except (IOError, ValueError, serial.serialutil.SerialException) as e:
-              LOG.error("Got exception '%s' in mgmt thread", e)
-          elif data['action'] == 'set' and 'data' in data:
-            for key in data['data']:
-              STATUS[key] = data['data'][key]
-              if key == 'mgw':
-                self.mgw.enabled.set() if data['data'][key] else self.mgw.enabled.clear()
-              elif key == 'msd':
-                self.msd.enabled.set() if data['data'][key] else self.msd.enabled.clear()
+
+      LOG.debug("Got '%s' on mgmt socket", data)
+
+      if not data:
+        continue
+
+      try:
+        data = json.loads(data)
+      except (ValueError) as e:
+        LOG.warning("Cannot decode recieved data in mgmt thread: %s", e)
+        continue
+
+      response = self.handle_action(data)
+      if response:
+        conn.send(json.dumps(response))
 
       conn.close()
 
@@ -446,7 +461,7 @@ class mgw_Thread(threading.Thread):
 
       sensor_config = self.sensor_map.get(sensor_type)
       if not sensor_config or not sensor_config.get('action'):
-        LOG.warning("Missing sensor_map/action for sensor_type '%s'", sensor_type)
+        LOG.debug("Missing sensor_map/action for sensor_type '%s'", sensor_type)
         continue
 
       board_id = str(sensor_data['board_id'])
@@ -465,14 +480,15 @@ ACTION_STATUS = {}
 
 LOG = logging.getLogger(__name__)
 
-if __name__ == "__main__":
+
+def main():
   parser = argparse.ArgumentParser(description='Moteino gateway')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
   parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
 
-  conf = load_config(args.dir + '/global.config.json')
+  conf = utils.load_config(args.dir + '/global.config.json')
 
   if args.create_db or args.sync_db_desc:
     create_db(conf['db_file'], args.dir, args.create_db)
@@ -482,3 +498,7 @@ if __name__ == "__main__":
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()
+
+
+if __name__ == "__main__":
+  main()
