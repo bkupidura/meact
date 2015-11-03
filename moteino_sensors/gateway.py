@@ -15,6 +15,7 @@ import time
 import requests
 import serial
 
+from moteino_sensors import database
 from moteino_sensors import utils
 
 
@@ -143,11 +144,6 @@ def action_helper(data, action_details, action_config=None):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
 
-def connect_db(db_file):
-  db = sqlite3.connect(db_file)
-  return db
-
-
 # NOTE(prmtl): this could be also loaded from file to save
 BOARDS_TABLE_SQL = """
 DROP TABLE IF EXISTS board_desc;
@@ -202,7 +198,7 @@ END;
 
 def create_db(db_file, appdir, create_metrics_table=False):
   board_map = utils.load_config(appdir + '/boards.config.json')
-  db = connect_db(db_file)
+  db = database.connect(db_file)
 
   db.executescript(BOARDS_TABLE_SQL)
 
@@ -345,7 +341,7 @@ class failure_Thread(threading.Thread):
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
     while True:
       self.enabled.wait()
       now = int(time.time())
@@ -430,7 +426,7 @@ class mgw_Thread(threading.Thread):
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
 
     while True:
       self.enabled.wait()
