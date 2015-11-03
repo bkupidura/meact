@@ -145,13 +145,9 @@ def action_helper(data, action_details, action_config=None):
 
 
 class mgmt_Thread(threading.Thread):
-  def __init__(self, appdir):
+  def __init__(self, conf, boards_map, sensors_map):
     super(mgmt_Thread, self).__init__()
     self.name = 'mgmt'
-
-    conf = utils.load_config(appdir + '/global.config.json')
-    board_map = utils.load_config(appdir + '/boards.config.json')
-    sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
     self.serial = serial.Serial(
@@ -168,7 +164,7 @@ class mgmt_Thread(threading.Thread):
       action_interval=conf['msd']['action_interval'],
       query=conf['msd']['query'],
       action=conf['msd']['action'],
-      board_map=board_map,
+      board_map=boards_map,
       action_config=conf['action_config'])
 
     self.mgw = mgw_Thread(
@@ -176,8 +172,8 @@ class mgmt_Thread(threading.Thread):
       loop_sleep=conf['loop_sleep'],
       gateway_ping_time=conf['gateway_ping_time'],
       db_file=conf['db_file'],
-      board_map=board_map,
-      sensor_map=sensor_map,
+      board_map=boards_map,
+      sensor_map=sensors_map,
       action_config=conf['action_config'])
 
   def handle_action(self, data):
@@ -401,6 +397,7 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
+  sensors_map = utils.load_config(args.dir + '/sensors.config.json')
   boards_map = utils.load_config(args.dir + '/boards.config.json')
 
   db = database.connect(conf['db_file'])
@@ -419,7 +416,11 @@ def main():
   logging.getLogger("requests").setLevel(logging.CRITICAL)
   requests.packages.urllib3.disable_warnings()
 
-  mgmt = mgmt_Thread(appdir=args.dir)
+  mgmt = mgmt_Thread(
+    conf=conf,
+    boards_map=boards_map,
+    sensors_map=sensors_map,
+  )
   mgmt.start()
 
 
