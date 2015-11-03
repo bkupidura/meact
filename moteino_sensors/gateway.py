@@ -116,7 +116,7 @@ class mgmt_Thread(threading.Thread):
       action_config=conf['action_config'])
 
     self.mgw = mgw_Thread(
-      ser=self.serial,
+      serial=self.serial,
       loop_sleep=conf['loop_sleep'],
       gateway_ping_time=conf['gateway_ping_time'],
       db_file=conf['db_file'],
@@ -230,7 +230,7 @@ class mgw_Thread(threading.Thread):
   _re_sensor_data = re.compile(
     '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
-  def __init__(self, ser, loop_sleep, gateway_ping_time,
+  def __init__(self, serial, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
     super(mgw_Thread, self).__init__()
     self.name = 'mgw'
@@ -238,7 +238,7 @@ class mgw_Thread(threading.Thread):
     self.enabled = threading.Event()
     if STATUS[self.name]:
       self.enabled.set()
-    self.serial = ser
+    self.serial = serial
     self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
