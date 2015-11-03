@@ -8,7 +8,6 @@ import argparse
 from moteino_sensors import utils
 
 def api_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False):
-  logging.getLogger("urllib3").setLevel(logging.CRITICAL)
   try:
     req = requests.request(method, url, params=params,
             data=data, headers=headers, auth=auth, verify=verify_ssl, timeout=2)
@@ -57,7 +56,10 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
+
   utils.create_logger(logging.INFO)
+  logging.getLogger("requests").setLevel(logging.CRITICAL)
+  requests.packages.urllib3.disable_warnings()
 
   LOG.info('Starting')
   while True:

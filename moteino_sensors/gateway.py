@@ -46,7 +46,7 @@ def send_sms(data, action_config):
   else:
     msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
 
-  LOG.debug('Sending SMS')
+  LOG.info('Sending SMS')
 
   url = action_config['endpoint']
   params = {'username': action_config['user'],
@@ -54,7 +54,6 @@ def send_sms(data, action_config):
           'msisdn': action_config['recipient'],
           'message': msg}
 
-  logging.getLogger("urllib3").setLevel(logging.CRITICAL)
   try:
     r = requests.get(url, params=params, timeout=5)
     r.raise_for_status()
@@ -79,7 +78,7 @@ def send_mail(data, action_config):
   else:
     msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
 
-  LOG.debug('Sending mail')
+  LOG.info('Sending mail')
 
   message = "From: {sender}\nTo: {recipient}\nSubject: {subject}\n\n{msg}\n\n".format(msg=msg, **action_config)
   try:
@@ -481,6 +480,8 @@ def main():
     sys.exit(0)
 
   utils.create_logger(conf['logging']['level'])
+  logging.getLogger("requests").setLevel(logging.CRITICAL)
+  requests.packages.urllib3.disable_warnings()
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()
