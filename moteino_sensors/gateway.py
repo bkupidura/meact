@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import abc
 import argparse
 import json
 import logging
@@ -183,11 +184,14 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 
-class msd_Thread(threading.Thread):
+class DBQueryThread(threading.Thread):
+  __metaclass__ = abc.ABCMeta
+
+  name = None
+
   def __init__(self, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
-    super(msd_Thread, self).__init__()
-    self.name = 'msd'
+    super(DBQueryThread, self).__init__()
     self.daemon = True
     self.enabled = threading.Event()
     if STATUS[self.name]:
@@ -201,7 +205,31 @@ class msd_Thread(threading.Thread):
     self.action_config = action_config
     self.failed = {}
 
-  def handle_failed(self, board_id, value):
+  def run(self):
+    LOG.info('Starting')
+    self.db = database.connect(self.db_file)
+    while True:
+      self.enabled.wait()
+
+      result = self.db.execute(self.query)
+      self.handle_query_result(result)
+
+      time.sleep(self.loop_sleep)
+
+  def handle_query_result(self, query_result):
+      for board_id, value in query_result:
+        self.handle_result(board_id, value)
+
+  @abc.abstractmethod
+  def handle_result(self, board_id, value):
+    pass
+
+
+class msd_Thread(DBQueryThread):
+
+  name = 'msd'
+
+  def handle_result(self, board_id, value):
     now = int(time.time())
     data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
     action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
@@ -211,17 +239,6 @@ class msd_Thread(threading.Thread):
 
     data['message'] = message
     action_helper(data, action_details, self.action_config)
-
-  def run(self):
-    LOG.info('Starting')
-    self.db = database.connect(self.db_file)
-    while True:
-      self.enabled.wait()
-
-      for board_id, value in self.db.execute(self.query):
-        self.handle_failed(board_id, value)
-
-      time.sleep(self.loop_sleep)
 
 
 class mgw_Thread(threading.Thread):
