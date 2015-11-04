@@ -1,17 +1,19 @@
 #!/usr/bin/env python
-import serial
-import time
-import json
-import sqlite3
-import threading
-import random
-import logging
-import sys
-import os
-import socket
-import re
 import argparse
+import json
+import logging
+import os
+import random
+import re
+import socket
+import sqlite3
+import sys
+import threading
+import time
 
+import serial
+
+from moteino_sensors import database
 from moteino_sensors import utils
 
 
@@ -89,81 +91,6 @@ def action_helper(data, action_details, action_config=None):
 
   if action_execute(data, action_details['action'], action_config):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
-
-
-def connect_db(db_file):
-  db = sqlite3.connect(db_file)
-  return db
-
-
-# NOTE(prmtl): this could be also loaded from file to save
-BOARDS_TABLE_SQL = """
-DROP TABLE IF EXISTS board_desc;
-CREATE TABLE board_desc (
-  board_id TEXT PRIMARY KEY,
-  board_desc TEXT
-);
-"""
-
-
-METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS metrics;
-CREATE TABLE metrics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  board_id TEXT, sensor_type TEXT,
-  last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')),
-  data TEXT DEFAULT NULL
-);
-
-DROP INDEX IF EXISTS idx_board_id;
-CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data);
-"""
-
-
-LAST_METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS last_metrics;
-CREATE TABLE last_metrics (
-  board_id TEXT,
-  sensor_type TEXT,
-  last_update TIMESTAMP,
-  data TEXT
-);
-DROP TRIGGER IF EXISTS insert_metric;
-CREATE TRIGGER insert_metric
-  INSERT ON metrics WHEN NOT EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
-  )
-BEGIN
-  INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.data);
-END;
-
-DROP TRIGGER IF EXISTS update_metric;
-CREATE TRIGGER update_metric
-  INSERT ON metrics WHEN EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
-  )
-BEGIN
-  UPDATE last_metrics SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id and sensor_type==new.sensor_type;
-END;
-"""
-
-
-def create_db(db_file, appdir, create_metrics_table=False):
-  board_map = utils.load_config(appdir + '/boards.config.json')
-  db = connect_db(db_file)
-
-  db.executescript(BOARDS_TABLE_SQL)
-
-  db.executemany(
-    "INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
-    board_map.iteritems()
-  )
-  db.commit()
-
-  if create_metrics_table:
-    db.executescript(METRICS_TABLE_SQL)
-
-  db.executescript(LAST_METRICS_TABLE_SQL)
 
 
 class mgmt_Thread(threading.Thread):
@@ -293,7 +220,7 @@ class failure_Thread(threading.Thread):
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
     while True:
       self.enabled.wait()
       now = int(time.time())
@@ -378,7 +305,7 @@ class mgw_Thread(threading.Thread):
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
 
     while True:
       self.enabled.wait()
@@ -423,9 +350,18 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
+  boards_map = utils.load_config(args.dir + '/boards.config.json')
 
-  if args.create_db or args.sync_db_desc:
-    create_db(conf['db_file'], args.dir, args.create_db)
+  db = database.connect(conf['db_file'])
+
+  if args.create_db:
+    database.create_db(db, boards_map)
+    print('Database created in {}'.format(conf['db_file']))
+    sys.exit(0)
+
+  if args.sync_db_desc:
+    database.sync_boards(db, boards_map)
+    print('Syned boards in {}'.format(conf['db_file']))
     sys.exit(0)
 
   utils.create_logger(conf['logging']['level'])
