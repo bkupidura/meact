@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-import socket
+import argparse
 import json
+import os
+import socket
 import time
-import netaddr
+
 import bottle
 import bottle.ext.sqlite
-import argparse
+import netaddr
 
 from moteino_sensors import utils
 
@@ -156,7 +158,14 @@ def main():
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   args = parser.parse_args()
 
-  app.config['appconfig'] = utils.load_config(args.dir + '/global.config.json')
+  api_config = utils.load_config(args.dir + '/global.config.json')
+
+  # static_dir in config file should be specified only if
+  # static files are located somewhere else than app package
+  if not api_config.get('static_dir'):
+      api_config['static_dir'] = os.path.join(os.path.dirname(__file__), 'static')
+
+  app.config['appconfig'] = api_config
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)
