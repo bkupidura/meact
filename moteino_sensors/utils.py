@@ -1,7 +1,11 @@
 import json
 import logging
 import os
+import pkgutil
 import sys
+
+
+from moteino_sensors import actions
 
 
 def load_config(config_name):
@@ -26,3 +30,19 @@ def create_logger(level, log_file=None):
 
   handler.setFormatter(formatter)
   logger.addHandler(handler)
+
+
+def _load_actions():
+    mapping = {}
+
+    prefix = actions.__name__ + '.'
+    for _, action_name, _ in pkgutil.iter_modules(actions.__path__):
+        action_module = __import__(prefix + action_name,
+                                   globals(), locals(), fromlist=[action_name, ])
+        action_func = getattr(action_module, action_name)
+        mapping[action_name] = action_func
+        # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
+    return mapping
+
+
+ACTIONS_MAPPING = _load_actions()
