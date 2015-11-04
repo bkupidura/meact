@@ -11,7 +11,6 @@ import os
 import socket
 import re
 import argparse
-import requests
 
 from moteino_sensors import utils
 
@@ -430,8 +429,6 @@ def main():
     sys.exit(0)
 
   utils.create_logger(conf['logging']['level'])
-  logging.getLogger("requests").setLevel(logging.CRITICAL)
-  requests.packages.urllib3.disable_warnings()
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()

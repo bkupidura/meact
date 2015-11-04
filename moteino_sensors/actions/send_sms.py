@@ -6,6 +6,10 @@ import requests
 LOG = logging.getLogger(__name__)
 
 
+logging.getLogger("requests").setLevel(logging.CRITICAL)
+requests.packages.urllib3.disable_warnings()
+
+
 def send_sms(data, action_config):
   if not action_config.get('enabled'):
     return False
