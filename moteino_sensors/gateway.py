@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import abc
 import argparse
 import json
 import logging
@@ -94,13 +95,9 @@ def action_helper(data, action_details, action_config=None):
 
 
 class mgmt_Thread(threading.Thread):
-  def __init__(self, appdir):
+  def __init__(self, conf, boards_map, sensors_map):
     super(mgmt_Thread, self).__init__()
     self.name = 'mgmt'
-
-    conf = utils.load_config(appdir + '/global.config.json')
-    board_map = utils.load_config(appdir + '/boards.config.json')
-    sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
     self.serial = serial.Serial(
@@ -110,23 +107,22 @@ class mgmt_Thread(threading.Thread):
     )
 
     # Missing sensor detector thread
-    self.msd = failure_Thread(
-      name='msd',
+    self.msd = msd_Thread(
       loop_sleep=conf['msd']['loop_sleep'],
       db_file=conf['db_file'],
       action_interval=conf['msd']['action_interval'],
       query=conf['msd']['query'],
       action=conf['msd']['action'],
-      board_map=board_map,
+      board_map=boards_map,
       action_config=conf['action_config'])
 
     self.mgw = mgw_Thread(
-      ser=self.serial,
+      serial=self.serial,
       loop_sleep=conf['loop_sleep'],
       gateway_ping_time=conf['gateway_ping_time'],
       db_file=conf['db_file'],
-      board_map=board_map,
-      sensor_map=sensor_map,
+      board_map=boards_map,
+      sensor_map=sensors_map,
       action_config=conf['action_config'])
 
   def handle_action(self, data):
@@ -188,14 +184,17 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 
-class failure_Thread(threading.Thread):
-  def __init__(self, name, loop_sleep, db_file, action_interval,
+class DBQueryThread(threading.Thread):
+  __metaclass__ = abc.ABCMeta
+
+  name = None
+
+  def __init__(self, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
-    super(failure_Thread, self).__init__()
-    self.name = name
+    super(DBQueryThread, self).__init__()
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS[name]:
+    if STATUS[self.name]:
       self.enabled.set()
     self.loop_sleep = loop_sleep
     self.db_file = db_file
@@ -206,29 +205,40 @@ class failure_Thread(threading.Thread):
     self.action_config = action_config
     self.failed = {}
 
-  def handle_failed(self, board_id, value):
-    now = int(time.time())
-    data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
-    action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
-
-    if self.name == 'msd':
-      message = 'No update from {} ({}) since {} seconds'.format(self.board_map[board_id],
-              board_id, now - value)
-
-      data['message'] = message
-      action_helper(data, action_details, self.action_config)
-
   def run(self):
     LOG.info('Starting')
     self.db = database.connect(self.db_file)
     while True:
       self.enabled.wait()
-      now = int(time.time())
 
-      for board_id, value in self.db.execute(self.query):
-        self.handle_failed(board_id, value)
+      result = self.db.execute(self.query)
+      self.handle_query_result(result)
 
       time.sleep(self.loop_sleep)
+
+  def handle_query_result(self, query_result):
+      for board_id, value in query_result:
+        self.handle_result(board_id, value)
+
+  @abc.abstractmethod
+  def handle_result(self, board_id, value):
+    pass
+
+
+class msd_Thread(DBQueryThread):
+
+  name = 'msd'
+
+  def handle_result(self, board_id, value):
+    now = int(time.time())
+    data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
+    action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
+
+    message = 'No update from {} ({}) since {} seconds'.format(
+      self.board_map[board_id], board_id, now - value)
+
+    data['message'] = message
+    action_helper(data, action_details, self.action_config)
 
 
 class mgw_Thread(threading.Thread):
@@ -237,15 +247,15 @@ class mgw_Thread(threading.Thread):
   _re_sensor_data = re.compile(
     '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
-  def __init__(self, ser, loop_sleep, gateway_ping_time,
+  def __init__(self, serial, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
     super(mgw_Thread, self).__init__()
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS["mgw"]:
+    if STATUS[self.name]:
       self.enabled.set()
-    self.serial = ser
+    self.serial = serial
     self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
@@ -350,6 +360,7 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
+  sensors_map = utils.load_config(args.dir + '/sensors.config.json')
   boards_map = utils.load_config(args.dir + '/boards.config.json')
 
   db = database.connect(conf['db_file'])
@@ -366,7 +377,11 @@ def main():
 
   utils.create_logger(conf['logging']['level'])
 
-  mgmt = mgmt_Thread(appdir=args.dir)
+  mgmt = mgmt_Thread(
+    conf=conf,
+    boards_map=boards_map,
+    sensors_map=sensors_map,
+  )
   mgmt.start()
 
 
