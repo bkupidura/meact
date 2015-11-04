@@ -11,8 +11,6 @@ import os
 import socket
 import re
 import argparse
-import requests
-import smtplib
 
 from moteino_sensors import utils
 
@@ -32,77 +30,28 @@ class ActionDetailsAdapter(dict):
     )
 
 
-def log(data, action_config):
-  LOG.info("Log action for '%s'", data)
-  return True
-
-
-def send_sms(data, action_config):
-  if not action_config.get('enabled'):
-    return False
-
-  if 'message' in data:
-    msg = data['message']
-  else:
-    msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
-
-  LOG.info('Sending SMS')
-
-  url = action_config['endpoint']
-  params = {'username': action_config['user'],
-          'password': action_config['password'],
-          'msisdn': action_config['recipient'],
-          'message': msg}
-
-  try:
-    r = requests.get(url, params=params, timeout=5)
-    r.raise_for_status()
-  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
-    LOG.warning("Got exception '%s' in send_sms", e)
-    return False
-
-  result = r.text.split('|')
-  if result[0] != '0':
-    LOG.warning("Fail in send_sms '%s' '%s'", result[0], result[1])
-    return False
-
-  return True
-
-
-def send_mail(data, action_config):
-  if not action_config.get('enabled'):
-    return False
-
-  if 'message' in data:
-    msg = data['message']
-  else:
-    msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
-
-  LOG.info('Sending mail')
-
-  message = "From: {sender}\nTo: {recipient}\nSubject: {subject}\n\n{msg}\n\n".format(msg=msg, **action_config)
-  try:
-    s = smtplib.SMTP(action_config['host'], action_config['port'], timeout=5)
-    s.starttls()
-    s.login(action_config['user'], action_config['password'])
-    s.sendmail(action_config['sender'], action_config['recipient'], message)
-    s.quit()
-  except (socket.gaierror, socket.timeout, smtplib.SMTPAuthenticationError, smtplib.SMTPDataError) as e:
-    LOG.warning("Got exception '%s' in send_mail", e)
-    return False
-  else:
-    return True
-
-
-def action_execute(data, action, action_config):
+def action_execute(data, actions, action_config):
   result = 0
-  for a in action:
+
+  for a in actions:
     LOG.debug("Action execute '%s'", a)
-    if not eval(a['name'])(data, action_config.get(a['name'])):
-      if 'failback' in a:
-        result += action_execute(data, a['failback'], action_config)
+
+    action_name = a['name']
+    action_func = utils.ACTIONS_MAPPING.get(action_name)
+    conf = action_config.get(action_name)
+
+    if not action_func:
+      LOG.warning('Unknown action %s', action_name)
+      continue
+
+    if not action_func(data, conf):
+      failback_actions = a.get('failback')
+      if failback_actions:
+        LOG.debug('Action failed, failback %s', failback_actions)
+        result += action_execute(data, failback_actions, action_config)
     else:
       result += 1
+
   return result
 
 
@@ -480,8 +429,6 @@ def main():
     sys.exit(0)
 
   utils.create_logger(conf['logging']['level'])
-  logging.getLogger("requests").setLevel(logging.CRITICAL)
-  requests.packages.urllib3.disable_warnings()
 
   mgmt = mgmt_Thread(appdir=args.dir)
   mgmt.start()
