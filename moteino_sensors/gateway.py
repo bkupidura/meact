@@ -1,19 +1,21 @@
 #!/usr/bin/env python
-import serial
-import time
-import json
-import sqlite3
-import threading
-import random
-import logging
-import sys
-import os
-import socket
-import re
 import argparse
-import requests
+import json
+import logging
+import os
+import random
+import re
 import smtplib
+import socket
+import sqlite3
+import sys
+import threading
+import time
 
+import requests
+import serial
+
+from moteino_sensors import database
 from moteino_sensors import utils
 
 
@@ -142,89 +144,10 @@ def action_helper(data, action_details, action_config=None):
     ACTION_STATUS[data['board_id']][data['sensor_type']]['last_action'] = now
 
 
-def connect_db(db_file):
-  db = sqlite3.connect(db_file)
-  return db
-
-
-# NOTE(prmtl): this could be also loaded from file to save
-BOARDS_TABLE_SQL = """
-DROP TABLE IF EXISTS board_desc;
-CREATE TABLE board_desc (
-  board_id TEXT PRIMARY KEY,
-  board_desc TEXT
-);
-"""
-
-
-METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS metrics;
-CREATE TABLE metrics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  board_id TEXT, sensor_type TEXT,
-  last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')),
-  data TEXT DEFAULT NULL
-);
-
-DROP INDEX IF EXISTS idx_board_id;
-CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data);
-"""
-
-
-LAST_METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS last_metrics;
-CREATE TABLE last_metrics (
-  board_id TEXT,
-  sensor_type TEXT,
-  last_update TIMESTAMP,
-  data TEXT
-);
-DROP TRIGGER IF EXISTS insert_metric;
-CREATE TRIGGER insert_metric
-  INSERT ON metrics WHEN NOT EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
-  )
-BEGIN
-  INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.data);
-END;
-
-DROP TRIGGER IF EXISTS update_metric;
-CREATE TRIGGER update_metric
-  INSERT ON metrics WHEN EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
-  )
-BEGIN
-  UPDATE last_metrics SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id and sensor_type==new.sensor_type;
-END;
-"""
-
-
-def create_db(db_file, appdir, create_metrics_table=False):
-  board_map = utils.load_config(appdir + '/boards.config.json')
-  db = connect_db(db_file)
-
-  db.executescript(BOARDS_TABLE_SQL)
-
-  db.executemany(
-    "INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
-    board_map.iteritems()
-  )
-  db.commit()
-
-  if create_metrics_table:
-    db.executescript(METRICS_TABLE_SQL)
-
-  db.executescript(LAST_METRICS_TABLE_SQL)
-
-
 class mgmt_Thread(threading.Thread):
-  def __init__(self, appdir):
+  def __init__(self, conf, boards_map, sensors_map):
     super(mgmt_Thread, self).__init__()
     self.name = 'mgmt'
-
-    conf = utils.load_config(appdir + '/global.config.json')
-    board_map = utils.load_config(appdir + '/boards.config.json')
-    sensor_map = utils.load_config(appdir + '/sensors.config.json')
 
     self.socket = conf['mgmt_socket']
     self.serial = serial.Serial(
@@ -234,23 +157,22 @@ class mgmt_Thread(threading.Thread):
     )
 
     # Missing sensor detector thread
-    self.msd = failure_Thread(
-      name='msd',
+    self.msd = msd_Thread(
       loop_sleep=conf['msd']['loop_sleep'],
       db_file=conf['db_file'],
       action_interval=conf['msd']['action_interval'],
       query=conf['msd']['query'],
       action=conf['msd']['action'],
-      board_map=board_map,
+      board_map=boards_map,
       action_config=conf['action_config'])
 
     self.mgw = mgw_Thread(
-      ser=self.serial,
+      serial=self.serial,
       loop_sleep=conf['loop_sleep'],
       gateway_ping_time=conf['gateway_ping_time'],
       db_file=conf['db_file'],
-      board_map=board_map,
-      sensor_map=sensor_map,
+      board_map=boards_map,
+      sensor_map=sensors_map,
       action_config=conf['action_config'])
 
   def handle_action(self, data):
@@ -312,14 +234,14 @@ class mgmt_Thread(threading.Thread):
       conn.close()
 
 
-class failure_Thread(threading.Thread):
-  def __init__(self, name, loop_sleep, db_file, action_interval,
+class msd_Thread(threading.Thread):
+  def __init__(self, loop_sleep, db_file, action_interval,
           query, action, board_map, action_config):
-    super(failure_Thread, self).__init__()
-    self.name = name
+    super(msd_Thread, self).__init__()
+    self.name = 'msd'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS[name]:
+    if STATUS[self.name]:
       self.enabled.set()
     self.loop_sleep = loop_sleep
     self.db_file = db_file
@@ -335,19 +257,17 @@ class failure_Thread(threading.Thread):
     data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
     action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
 
-    if self.name == 'msd':
-      message = 'No update from {} ({}) since {} seconds'.format(self.board_map[board_id],
-              board_id, now - value)
+    message = 'No update from {} ({}) since {} seconds'.format(
+      self.board_map[board_id], board_id, now - value)
 
-      data['message'] = message
-      action_helper(data, action_details, self.action_config)
+    data['message'] = message
+    action_helper(data, action_details, self.action_config)
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
     while True:
       self.enabled.wait()
-      now = int(time.time())
 
       for board_id, value in self.db.execute(self.query):
         self.handle_failed(board_id, value)
@@ -361,15 +281,15 @@ class mgw_Thread(threading.Thread):
   _re_sensor_data = re.compile(
     '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
-  def __init__(self, ser, loop_sleep, gateway_ping_time,
+  def __init__(self, serial, loop_sleep, gateway_ping_time,
           db_file, board_map, sensor_map, action_config):
     super(mgw_Thread, self).__init__()
     self.name = 'mgw'
     self.daemon = True
     self.enabled = threading.Event()
-    if STATUS["mgw"]:
+    if STATUS[self.name]:
       self.enabled.set()
-    self.serial = ser
+    self.serial = serial
     self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
@@ -429,7 +349,7 @@ class mgw_Thread(threading.Thread):
 
   def run(self):
     LOG.info('Starting')
-    self.db = connect_db(self.db_file)
+    self.db = database.connect(self.db_file)
 
     while True:
       self.enabled.wait()
@@ -474,16 +394,30 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
+  sensors_map = utils.load_config(args.dir + '/sensors.config.json')
+  boards_map = utils.load_config(args.dir + '/boards.config.json')
 
-  if args.create_db or args.sync_db_desc:
-    create_db(conf['db_file'], args.dir, args.create_db)
+  db = database.connect(conf['db_file'])
+
+  if args.create_db:
+    database.create_db(db, boards_map)
+    print('Database created in {}'.format(conf['db_file']))
+    sys.exit(0)
+
+  if args.sync_db_desc:
+    database.sync_boards(db, boards_map)
+    print('Syned boards in {}'.format(conf['db_file']))
     sys.exit(0)
 
   utils.create_logger(conf['logging']['level'])
   logging.getLogger("requests").setLevel(logging.CRITICAL)
   requests.packages.urllib3.disable_warnings()
 
-  mgmt = mgmt_Thread(appdir=args.dir)
+  mgmt = mgmt_Thread(
+    conf=conf,
+    boards_map=boards_map,
+    sensors_map=sensors_map,
+  )
   mgmt.start()
 
 
