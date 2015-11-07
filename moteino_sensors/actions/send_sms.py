@@ -14,11 +14,6 @@ def send_sms(data, action_config):
   if not action_config.get('enabled'):
     return False
 
-  if 'message' in data:
-    msg = data['message']
-  else:
-    msg = '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}'.format(**data)
-
   LOG.info('Sending SMS')
 
   url = action_config['endpoint']
@@ -26,7 +21,7 @@ def send_sms(data, action_config):
       'username': action_config['user'],
       'password': action_config['password'],
       'msisdn': action_config['recipient'],
-      'message': msg,
+      'message': data['message'],
   }
 
   try:

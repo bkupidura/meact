@@ -5,7 +5,8 @@
     "action_interval": 360,
     "threshold": "lambda x: float(x)<3.2",
     "fail_count": 2,
-    "fail_interval": 300
+    "fail_interval": 300,
+    "message_template": "Board {board_desc} ({board_id}) reports low voltage {sensor_data}V"
   },
   "motion": {
     "action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
@@ -13,6 +14,16 @@
     "action_interval": 360,
     "threshold": "lambda x: int(x)==1",
     "fail_count": 0,
-    "fail_interval": 0
+    "fail_interval": 0,
+    "message_template": "Motion detected on board {board_desc} ({board_id})"
+  },
+  "uptime": {
+    "action": [{"name": "send_mail"}, {"name": "log"}],
+    "check_if_armed": {"default": 0},
+    "action_interval": 3600,
+    "threshold": "lambda x: int(x)<25",
+    "fail_count": 0,
+    "fail_interval": 0,
+    "message_template": "Board {board_desc} ({board_id}) was rebooted"
   }
 }

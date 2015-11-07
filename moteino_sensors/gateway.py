@@ -65,6 +65,13 @@ def action_helper(data, action_details, action_config=None):
   action_details.setdefault('threshold', 'lambda x: True')
   action_details.setdefault('fail_count', 0)
   action_details.setdefault('fail_interval', 600)
+  action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+
+  try:
+    data['message'] = action_details['message_template'].format(**data)
+  except (KeyError) as e:
+    LOG.error("Fail to format message '%s' with data '%s'", action_details['message_template'], data)
+    return
 
   action_details = ActionDetailsAdapter(action_details)
 
@@ -231,13 +238,15 @@ class msd_Thread(DBQueryThread):
 
   def handle_result(self, board_id, value):
     now = int(time.time())
-    data = {'board_id': board_id, 'sensor_data': 1, 'sensor_type': self.name}
-    action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
+    data = {'board_id': board_id,
+            'board_desc': self.board_map.get(board_id),
+            'sensor_data': 1,
+            'sensor_type': self.name}
+    action_details = {'check_if_armed': {'default': 0},
+            'action_interval': self.action_interval,
+            'action': self.action,
+            'message_template': 'No update from {board_desc} ({board_id})'}
 
-    message = 'No update from {} ({}) since {} seconds'.format(
-      self.board_map.get(board_id), board_id, now - value)
-
-    data['message'] = message
     action_helper(data, action_details, self.action_config)
 
 
