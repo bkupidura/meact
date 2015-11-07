@@ -117,10 +117,9 @@ class mgmt_Thread(threading.Thread):
     self.msd = msd_Thread(
       loop_sleep=conf['msd']['loop_sleep'],
       db_file=conf['db_file'],
-      action_interval=conf['msd']['action_interval'],
       query=conf['msd']['query'],
-      action=conf['msd']['action'],
       board_map=boards_map,
+      sensor_map=sensors_map,
       action_config=conf['action_config'])
 
     self.mgw = mgw_Thread(
@@ -196,8 +195,8 @@ class DBQueryThread(threading.Thread):
 
   name = None
 
-  def __init__(self, loop_sleep, db_file, action_interval,
-          query, action, board_map, action_config):
+  def __init__(self, loop_sleep, db_file, query,
+          sensor_map, board_map, action_config):
     super(DBQueryThread, self).__init__()
     self.daemon = True
     self.enabled = threading.Event()
@@ -205,9 +204,8 @@ class DBQueryThread(threading.Thread):
       self.enabled.set()
     self.loop_sleep = loop_sleep
     self.db_file = db_file
-    self.action_interval = action_interval
     self.query = query
-    self.action = action
+    self.sensor_map = sensor_map
     self.board_map = board_map
     self.action_config = action_config
     self.failed = {}
@@ -240,14 +238,15 @@ class msd_Thread(DBQueryThread):
     now = int(time.time())
     data = {'board_id': board_id,
             'board_desc': self.board_map.get(board_id),
-            'sensor_data': 1,
+            'sensor_data': now - value,
             'sensor_type': self.name}
-    action_details = {'check_if_armed': {'default': 0},
-            'action_interval': self.action_interval,
-            'action': self.action,
-            'message_template': 'No update from {board_desc} ({board_id})'}
 
-    action_helper(data, action_details, self.action_config)
+    sensor_config = self.sensor_map.get(self.name)
+    if not sensor_config or not sensor_config.get('action'):
+      LOG.error("Missing sensor_map/action for sensor_type '%s'", sensor_type)
+      return
+
+    action_helper(data, sensor_config, self.action_config)
 
 
 class mgw_Thread(threading.Thread):
