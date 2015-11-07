@@ -235,7 +235,7 @@ class msd_Thread(DBQueryThread):
     action_details = {'check_if_armed': {'default': 0}, 'action_interval': self.action_interval, 'action': self.action}
 
     message = 'No update from {} ({}) since {} seconds'.format(
-      self.board_map[board_id], board_id, now - value)
+      self.board_map.get(board_id), board_id, now - value)
 
     data['message'] = message
     action_helper(data, action_details, self.action_config)
@@ -336,7 +336,7 @@ class mgw_Thread(threading.Thread):
         continue
 
       board_id = str(sensor_data['board_id'])
-      sensor_data['board_desc'] = self.board_map[board_id]
+      sensor_data['board_desc'] = self.board_map.get(board_id)
       action_helper(sensor_data, sensor_config, self.action_config)
 
 
