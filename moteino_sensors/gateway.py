@@ -261,7 +261,10 @@ class exc_Thread(threading.Thread):
     LOG.info('Starting')
     while True:
       self.enabled.wait()
-      sensor_data = ACTION_QUEUE.get()
+      try:
+        sensor_data = ACTION_QUEUE.get(True, 10)
+      except (Queue.Empty) as e:
+        continue
 
       sensor_type = sensor_data['sensor_type']
       sensor_config = self.sensors_map.get(sensor_type)
