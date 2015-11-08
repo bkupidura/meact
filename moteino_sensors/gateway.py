@@ -59,6 +59,11 @@ def action_execute(data, actions, action_config):
 
 
 def action_helper(data, action_details, action_config=None):
+
+  if not action_details or not action_details.get('action'):
+    LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
+    return
+
   action_details.setdefault('check_if_armed', {'default': True})
   action_details['check_if_armed'].setdefault('except', [])
   action_details.setdefault('action_interval', 0)
@@ -66,12 +71,6 @@ def action_helper(data, action_details, action_config=None):
   action_details.setdefault('fail_count', 0)
   action_details.setdefault('fail_interval', 600)
   action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-
-  try:
-    data['message'] = action_details['message_template'].format(**data)
-  except (KeyError) as e:
-    LOG.error("Fail to format message '%s' with data '%s'", action_details['message_template'], data)
-    return
 
   action_details = ActionDetailsAdapter(action_details)
 
@@ -83,6 +82,12 @@ def action_helper(data, action_details, action_config=None):
 
   ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] = \
     [i for i in ACTION_STATUS[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+
+  try:
+    data['message'] = action_details['message_template'].format(**data)
+  except (KeyError) as e:
+    LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
+    return
 
   if action_details.should_check_if_armed(data['board_id']) and not STATUS['armed']:
     return
@@ -242,9 +247,6 @@ class msd_Thread(DBQueryThread):
             'sensor_type': self.name}
 
     sensor_config = self.sensor_map.get(self.name)
-    if not sensor_config or not sensor_config.get('action'):
-      LOG.error("Missing sensor_map/action for sensor_type '%s'", sensor_type)
-      return
 
     action_helper(data, sensor_config, self.action_config)
 
@@ -337,14 +339,11 @@ class mgw_Thread(threading.Thread):
       self._save_sensors_data(sensor_data)
 
       sensor_type = sensor_data['sensor_type']
-
       sensor_config = self.sensor_map.get(sensor_type)
-      if not sensor_config or not sensor_config.get('action'):
-        LOG.debug("Missing sensor_map/action for sensor_type '%s'", sensor_type)
-        continue
 
       board_id = str(sensor_data['board_id'])
       sensor_data['board_desc'] = self.board_map.get(board_id)
+
       action_helper(sensor_data, sensor_config, self.action_config)
 
 
