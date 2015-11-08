@@ -5,3 +5,4 @@ netaddr
 pyserial
 requests
 urllib3
+timeout-decorator

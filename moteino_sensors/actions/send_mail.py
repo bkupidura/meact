@@ -1,11 +1,11 @@
 import logging
 import smtplib
 import socket
-
+import timeout_decorator
 
 LOG = logging.getLogger(__name__)
 
-
+@timeout_decorator.timeout(5, use_signals=False)
 def send_mail(data, action_config):
   if not action_config.get('enabled'):
     return False

@@ -17,6 +17,7 @@ import serial
 
 from moteino_sensors import database
 from moteino_sensors import utils
+from timeout_decorator import TimeoutError
 
 
 class ActionDetailsAdapter(dict):
@@ -200,13 +201,18 @@ class exc_Thread(threading.Thread):
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      if not action_func(data, conf):
-        failback_actions = a.get('failback')
-        if failback_actions:
-          LOG.debug('Action failed, failback %s', failback_actions)
-          result += self.action_execute(data, failback_actions, action_config)
-      else:
-        result += 1
+      try:
+        status = action_func(data, conf)
+      except (TimeoutError) as e:
+        status = False
+      finally:
+        if not status:
+          failback_actions = a.get('failback')
+          if failback_actions:
+            LOG.debug('Action failed, failback %s', failback_actions)
+            result += self.action_execute(data, failback_actions, action_config)
+        else:
+          result += 1
 
     return result
 
@@ -273,7 +279,6 @@ class exc_Thread(threading.Thread):
       sensor_data['board_desc'] = self.boards_map.get(board_id)
 
       self.action_helper(sensor_data, sensor_config, self.action_config)
-
 
 
 class mgw_Thread(threading.Thread):
