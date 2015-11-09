@@ -207,9 +207,10 @@ class exc_Thread(threading.Thread):
         status = False
       finally:
         if not status:
+          LOG.error("Fail to execute action '%s'", action_name)
           failback_actions = a.get('failback')
           if failback_actions:
-            LOG.debug('Action failed, failback %s', failback_actions)
+            LOG.debug("Failback '%s'", failback_actions)
             result += self.action_execute(data, failback_actions, action_config)
         else:
           result += 1
