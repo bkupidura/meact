@@ -28,6 +28,12 @@
       "user": "user",
       "password": "password",
       "enabled": 1
+    },
+    "send_sms_at": {
+      "recipient": ["+48000000000"],
+      "port": "/dev/ttyUSB1",
+      "speed": 19200,
+      "enabled": 1
     }
   },
   "loop_sleep": 10,

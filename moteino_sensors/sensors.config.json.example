@@ -9,7 +9,7 @@
     "message_template": "Board {board_desc} ({board_id}) reports low voltage {sensor_data}V"
   },
   "motion": {
-    "action": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+    "action": [{"name": "send_sms_at", "failback": [{"name": "send_sms"}]}, {"name": "log"}],
     "check_if_armed": {"default": 1, "except": ["12"]},
     "action_interval": 360,
     "threshold": "lambda x: int(x)==1",
