@@ -4,8 +4,65 @@ import json
 import time
 import logging
 import argparse
+import threading
 
 from moteino_sensors import utils
+from moteino_sensors import mqtt
+
+class FenceThread(mqtt.MqttThread):
+  def __init__(self, conf):
+    super(FenceThread, self).__init__()
+    self.name = 'fence'
+    self.enabled = threading.Event()
+    self.enabled.set()
+    self.conf = conf
+    self.mqtt_config = conf['mqtt']
+    self.start_mqtt()
+
+  def run(self):
+    LOG.info('Starting')
+    self.mqtt.loop_start()
+    self.mqtt._thread.setName(self.name+'-mqtt')
+    while True:
+      self.enabled.wait()
+      req = api_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))
+      if req:
+        self.check_action(req)
+      elif self.status.get('armed') == 0:
+        self.set_armed()
+      time.sleep(self.conf['loop_time'])
+
+  def check_action(self, data):
+    status = {
+      'enter': 0,
+      'exit': 0,
+    }
+    for device in data:
+      action = data[device]['action']
+      if device in self.conf['geo_devices']:
+        try:
+          status[action] += 1
+        except (KeyError):
+          pass
+
+    armed = self.status.get('armed')
+    if (armed == 1) and (status['enter'] > 0):
+      LOG.info('Disarm alarm')
+      self.unset_armed()
+    elif (armed == 0) and (status['exit'] == len(self.conf['geo_devices'])):
+      LOG.info('Arm alarm')
+      self.set_armed()
+
+  def set_armed(self):
+    self.status['armed'] = 1
+    self.update_status()
+
+  def unset_armed(self):
+    self.status['armed'] = 0
+    self.update_status()
+
+  def update_status(self):
+    mqtt.publish(self.mqtt, self.mqtt_config['topic']['mgmt']+'/status', self.status, retain=True)
 
 def api_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False):
   try:
@@ -21,31 +78,6 @@ def api_request(url, method='GET', params=None, data=None, auth=None, headers=No
     return {}
   return data
 
-def set_armed(mgw_api, status=0):
-  params = {'armed': status}
-  result = api_request('{}/action/status'.format(mgw_api),
-          method='POST', data=json.dumps(params),
-          headers={'content-type': 'application/json'})
-
-def check_action(data, allowed_devices, armed, mgw_api):
-  status = {
-    'enter': 0,
-    'exit': 0,
-  }
-  for device in data:
-    action = data[device]['action']
-    if device in allowed_devices:
-      try:
-        status[action] += 1
-      except (KeyError):
-        pass
-
-  if (armed == 1) and (status['enter'] > 0):
-    LOG.info('Disarm alarm')
-    set_armed(mgw_api, 0)
-  elif (armed == 0) and (status['exit'] == len(allowed_devices)):
-    LOG.info('Arm alarm')
-    set_armed(mgw_api, 1)
 
 LOG = logging.getLogger(__name__)
 
@@ -61,17 +93,8 @@ def main():
   logging.getLogger("requests").setLevel(logging.CRITICAL)
   requests.packages.urllib3.disable_warnings()
 
-  LOG.info('Starting')
-  while True:
-    mgw_status = api_request('{}/action/status'.format(conf['mgw_api']))
-    if mgw_status.get('fence'):
-      req = api_request(conf['geo_api'], auth=(conf['geo_user'], conf['geo_pass']))
-      if req:
-        check_action(req, conf['geo_devices'], mgw_status.get('armed'), conf['mgw_api'])
-      else:
-        set_armed(conf['mgw_api'], 1)
-
-    time.sleep(conf['loop_time'])
+  fence = FenceThread(conf=conf)
+  fence.start()
 
 
 if __name__ == "__main__":

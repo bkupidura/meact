@@ -1,22 +1,19 @@
 #!/usr/bin/env python
-import abc
 import argparse
-import json
 import logging
-import os
 import random
 import re
-import socket
 import sqlite3
 import sys
 import threading
 import time
-import Queue
+import paho.mqtt.client as paho
 
 import serial
 
 from moteino_sensors import database
 from moteino_sensors import utils
+from moteino_sensors import mqtt
 from timeout_decorator import TimeoutError
 
 
@@ -35,157 +32,33 @@ class ActionDetailsAdapter(dict):
     )
 
 
-class mgmt_Thread(threading.Thread):
-  def __init__(self, conf, boards_map, sensors_map):
-    super(mgmt_Thread, self).__init__()
-    self.name = 'mgmt'
+class ExcThread(mqtt.MqttThread):
 
-    self.socket = conf['mgmt_socket']
-    self.serial = serial.Serial(
-      conf['serial']['device'],
-      conf['serial']['speed'],
-      timeout=conf['serial']['timeout']
-    )
-
-    # Missing sensor detector thread
-    self.msd = msd_Thread(
-      loop_sleep=conf['msd']['loop_sleep'],
-      db_file=conf['db_file'],
-      query=conf['msd']['query'])
-
-    self.mgw = mgw_Thread(
-      serial=self.serial,
-      loop_sleep=conf['loop_sleep'],
-      gateway_ping_time=conf['gateway_ping_time'],
-      db_file=conf['db_file'])
-
-    self.exc = exc_Thread(boards_map=boards_map,
-      sensors_map=sensors_map,
-      action_config=conf['action_config'])
-
-  def handle_action(self, data):
-    if 'action' not in data:
-      LOG.debug('No action to handle')
-
-    if data['action'] == 'status':
-      return STATUS
-
-    if data['action'] == 'send' and 'data' in data:
-      try:
-        r_cmd = "{nodeid}:{cmd}".format(**data['data'])
-        self.serial.write(r_cmd)
-      except (IOError, ValueError, serial.serialutil.SerialException) as e:
-        LOG.error("Got exception '%s' in mgmt thread", e)
-
-    if data['action'] == 'set' and 'data' in data:
-      STATUS.update(data['data'])
-
-      if 'mgw' in data['data']:
-        self.mgw.enabled.set() if data['data']['mgw'] else self.mgw.enabled.clear()
-      if 'msd' in data['data']:
-        self.msd.enabled.set() if data['data']['msd'] else self.msd.enabled.clear()
-      if 'exc' in data['data']:
-        self.exc.enabled.set() if data['data']['exc'] else self.exc.enabled.clear()
-
-  def run(self):
-    LOG.info('Starting')
-
-    self.msd.start()
-    self.mgw.start()
-    self.exc.start()
-
-    if os.path.exists(self.socket):
-      os.remove(self.socket)
-
-    # TODO(prmtl): write a socket server class that will abstract this?
-    self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    self.server.bind(self.socket)
-    self.server.listen(1)
-
-    while True:
-      # TODO(prmtl): check if we can do it onece
-      conn, addr = self.server.accept()
-      data = conn.recv(1024)
-
-      LOG.debug("Got '%s' on mgmt socket", data)
-
-      if not data:
-        continue
-
-      try:
-        data = json.loads(data)
-      except (ValueError) as e:
-        LOG.warning("Cannot decode recieved data in mgmt thread: %s", e)
-        continue
-
-      response = self.handle_action(data)
-      if response:
-        conn.send(json.dumps(response))
-
-      conn.close()
-
-
-class DBQueryThread(threading.Thread):
-  __metaclass__ = abc.ABCMeta
-
-  name = None
-
-  def __init__(self, loop_sleep, db_file, query):
-    super(DBQueryThread, self).__init__()
-    self.daemon = True
-    self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
-    self.loop_sleep = loop_sleep
-    self.db_file = db_file
-    self.query = query
-
-  def run(self):
-    LOG.info('Starting')
-    self.db = database.connect(self.db_file)
-    while True:
-      self.enabled.wait()
-
-      result = self.db.execute(self.query)
-      self.handle_query_result(result)
-
-      time.sleep(self.loop_sleep)
-
-  def handle_query_result(self, query_result):
-      for board_id, value in query_result:
-        self.handle_result(board_id, value)
-
-  @abc.abstractmethod
-  def handle_result(self, board_id, value):
-    pass
-
-
-class msd_Thread(DBQueryThread):
-
-  name = 'msd'
-
-  def handle_result(self, board_id, value):
-    now = int(time.time())
-    data = {'board_id': board_id,
-            'sensor_data': now - value,
-            'sensor_type': self.name}
-
-    ACTION_QUEUE.put(data)
-
-
-class exc_Thread(threading.Thread):
-
-  def __init__(self, boards_map, sensors_map, action_config):
-    super(exc_Thread, self).__init__()
+  def __init__(self, boards_map, sensors_map, action_config, mqtt_config):
+    super(ExcThread, self).__init__()
     self.name = 'exc'
     self.daemon = True
-    self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
     self.action_status = {}
     self.boards_map = boards_map
     self.sensors_map = sensors_map
     self.action_config = action_config
+    self.mqtt_config = mqtt_config
+
+    self.start_mqtt()
+
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name], self.on_message)
+
+  def on_message(self, client, userdata, msg):
+    sensor_data = utils.load_json(msg.payload)
+
+    #Todo: Check if sensor_data have proper format
+    sensor_type = sensor_data['sensor_type']
+    sensor_config = self.sensors_map.get(sensor_type)
+
+    board_id = str(sensor_data['board_id'])
+    sensor_data['board_desc'] = self.boards_map.get(board_id)
+
+    self.action_helper(sensor_data, sensor_config, self.action_config)
 
   def action_execute(self, data, actions, action_config):
     result = 0
@@ -248,7 +121,7 @@ class exc_Thread(threading.Thread):
       LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
       return
 
-    if action_details.should_check_if_armed(data['board_id']) and not STATUS['armed']:
+    if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
       return
 
     if not eval(action_details['threshold'])(data['sensor_data']):
@@ -267,39 +140,50 @@ class exc_Thread(threading.Thread):
   def run(self):
     LOG.info('Starting')
     while True:
-      self.enabled.wait()
-      try:
-        sensor_data = ACTION_QUEUE.get(True, 10)
-      except (Queue.Empty) as e:
-        continue
-
-      sensor_type = sensor_data['sensor_type']
-      sensor_config = self.sensors_map.get(sensor_type)
-
-      board_id = str(sensor_data['board_id'])
-      sensor_data['board_desc'] = self.boards_map.get(board_id)
-
-      self.action_helper(sensor_data, sensor_config, self.action_config)
+      self.mqtt.loop()
 
 
-class mgw_Thread(threading.Thread):
+class MgwThread(mqtt.MqttThread):
 
   # [ID][metric:value] / [10][voltage:3.3]
   _re_sensor_data = re.compile(
     '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
+  status = {
+    'mgw': 1,
+    'msd': 1,
+    'armed': 1,
+    'fence': 1
+  }
 
-  def __init__(self, serial, loop_sleep, gateway_ping_time, db_file):
-    super(mgw_Thread, self).__init__()
+  def __init__(self, serial, gateway_ping_time, db_file, mqtt_config):
+    super(MgwThread, self).__init__()
     self.name = 'mgw'
-    self.daemon = True
     self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
+    self.enabled.set()
     self.serial = serial
-    self.loop_sleep = loop_sleep
     self.last_gw_ping = 0
     self.gateway_ping_time = gateway_ping_time
     self.db_file = db_file
+    self.mqtt_config = mqtt_config
+    self.start_mqtt()
+
+
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self.on_message_metric)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/serial', self.on_message_serial)
+
+  def on_message_metric(self, client, userdata, msg):
+    sensor_data = utils.load_json(msg.payload)
+    self._save_sensors_data(sensor_data)
+    mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
+
+  def on_message_serial(self, client, userdata, msg):
+    data = utils.load_json(msg.payload)
+
+    try:
+      r_cmd = "{nodeid}:{cmd}".format(**data['data'])
+      self.serial.write(r_cmd)
+    except (IOError, ValueError, serial.serialutil.SerialException) as e:
+      LOG.error("Got exception '%s' in mgmt thread", e)
 
   def ping_gateway(self):
     try:
@@ -320,7 +204,7 @@ class mgw_Thread(threading.Thread):
     except (IOError, ValueError, serial.serialutil.SerialException) as e:
       LOG.error("Got exception '%' in mgw thread", e)
       self.serial.close()
-      time.sleep(self.loop_sleep)
+      time.sleep(5)
       try:
         self.serial.open()
       except (OSError) as e:
@@ -353,6 +237,9 @@ class mgw_Thread(threading.Thread):
   def run(self):
     LOG.info('Starting')
     self.db = database.connect(self.db_file)
+    self.mqtt.loop_start()
+    self.mqtt._thread.setName(self.name+'-mqtt')
+    mqtt.publish(self.mqtt, self.mqtt_config['topic']['mgmt']+'/status', self.status, retain=True)
 
     while True:
       self.enabled.wait()
@@ -365,18 +252,8 @@ class mgw_Thread(threading.Thread):
 
       self._save_sensors_data(sensor_data)
 
-      ACTION_QUEUE.put(sensor_data)
+      mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
 
-
-STATUS = {
-  "armed": 1,
-  "msd": 1,
-  "mgw": 1,
-  "exc": 1,
-  "fence": 1,
-}
-
-ACTION_QUEUE = Queue.Queue()
 
 LOG = logging.getLogger(__name__)
 
@@ -406,12 +283,25 @@ def main():
 
   utils.create_logger(conf['logging']['level'])
 
-  mgmt = mgmt_Thread(
-    conf=conf,
+  ser = serial.Serial(
+    conf['serial']['device'],
+    conf['serial']['speed'],
+    timeout=conf['serial']['timeout']
+  )
+  mgw = MgwThread(
+    serial=ser,
+    gateway_ping_time=conf['gateway_ping_time'],
+    db_file=conf['db_file'],
+    mqtt_config=conf['mqtt'])
+
+  exc = ExcThread(
     boards_map=boards_map,
     sensors_map=sensors_map,
-  )
-  mgmt.start()
+    action_config=conf['action_config'],
+    mqtt_config=conf['mqtt'])
+
+  mgw.start()
+  exc.start()
 
 
 if __name__ == "__main__":

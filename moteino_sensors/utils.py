@@ -4,9 +4,7 @@ import os
 import pkgutil
 import sys
 
-
 from moteino_sensors import actions
-
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
@@ -30,6 +28,13 @@ def create_logger(level, log_file=None):
 
   handler.setFormatter(formatter)
   logger.addHandler(handler)
+
+
+def load_json(data):
+  try:
+    return json.loads(data)
+  except (ValueError) as e:
+    return {}
 
 
 def _load_actions():

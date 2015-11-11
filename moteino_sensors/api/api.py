@@ -2,29 +2,26 @@
 import argparse
 import json
 import os
-import socket
 import time
 
 import bottle
 import bottle.ext.sqlite
 import netaddr
 
+import paho.mqtt.client as paho
+from multiprocessing import Process, Manager
+
 from moteino_sensors import utils
+from moteino_sensors import mqtt
 
 
 app = bottle.Bottle()
 
-
-def write2socket(data, response=False):
-  data = json.dumps(data)
-
-  client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-  client.connect(app.config['appconfig']['mgmt_socket'])
-  client.send(data)
-
-  if response:
-    return client.recv(1024)
-
+def update_status():
+  mqtt_config = app.config['appconfig']['mqtt']
+  topic = mqtt_config['topic']['mgmt']+'/status'
+  data = app.config['status'].copy()
+  mqtt.single(topic, payload=data, retain=True, server=mqtt_config['server'])
 
 @app.hook('after_request')
 def after_request():
@@ -53,34 +50,27 @@ def static(filepath):
 
 @app.route('/api/action/status')
 def get_action_status():
-  output = write2socket({"action": "status"}, response=True)
-  return output
+  return app.config['status'].copy()
 
 
 @app.route('/api/action/status', method=['POST'])
 def set_action_status():
   data = bottle.request.json
   if data:
-    write2socket({
-      "action": "set",
-      "data": data
-    })
+    app.config['status'].update(data)
+    update_status()
 
 
 @app.route('/api/action/invert_status', method=['POST'])
 def action_invert_status():
   if (bottle.request.json):
-    status = json.loads(get_action_status())
+    status = get_action_status()
     name = bottle.request.json.get('name')
     cur_status = status.get(name)
     if cur_status is not None:
       inverted = not int(cur_status)
-      write2socket({
-        "action": "set",
-        "data": {
-          name: int(inverted)
-        }
-      })
+      app.config['status'].update({name: int(inverted)})
+      update_status()
 
 
 @app.route('/api/node', method=['GET', 'POST'])
@@ -153,6 +143,24 @@ def get_graph(db, graph_type='uptime'):
   return json.dumps(output)
 
 
+def on_message(client, userdata, msg):
+  userdata['status'].update(utils.load_json(msg.payload))
+
+def sync_mqtt(data):
+  mqtt_config = app.config['appconfig']['mqtt']
+  userdata = {
+    'subscribe_to': mqtt_config['topic']['mgmt']+'/status',
+    'status': data
+  }
+  mqtt_client = paho.Client(userdata=userdata)
+
+  mqtt.connect(mqtt_client, mqtt_config['server'])
+  mqtt_client.on_message = on_message
+
+  while True:
+    mqtt_client.loop()
+
+
 def main():
   parser = argparse.ArgumentParser(description='Moteino gateway API')
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
@@ -166,6 +174,11 @@ def main():
       api_config['static_dir'] = os.path.join(os.path.dirname(__file__), 'static')
 
   app.config['appconfig'] = api_config
+
+  manager = Manager().dict()
+  app.config['status'] = manager
+
+  Process(target=sync_mqtt, args=(manager,)).start()
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)
