@@ -20,7 +20,7 @@ app = bottle.Bottle()
 def update_status():
   mqtt_config = app.config['appconfig']['mqtt']
   topic = mqtt_config['topic']['mgmt']+'/status'
-  data = app.config['status'].copy()
+  data = app.config['sync'].status
   mqtt.single(topic, payload=data, retain=True, server=mqtt_config['server'])
 
 @app.hook('after_request')
@@ -50,14 +50,14 @@ def static(filepath):
 
 @app.route('/api/action/status')
 def get_action_status():
-  return app.config['status'].copy()
+  return app.config['sync'].status
 
 
 @app.route('/api/action/status', method=['POST'])
 def set_action_status():
   data = bottle.request.json
   if data:
-    app.config['status'].update(data)
+    app.config['sync'].status.update(data)
     update_status()
 
 
@@ -69,7 +69,7 @@ def action_invert_status():
     cur_status = status.get(name)
     if cur_status is not None:
       inverted = not int(cur_status)
-      app.config['status'].update({name: int(inverted)})
+      app.config['sync'].status.update({name: int(inverted)})
       update_status()
 
 
@@ -143,22 +143,17 @@ def get_graph(db, graph_type='uptime'):
   return json.dumps(output)
 
 
-def on_message(client, userdata, msg):
-  userdata['status'].update(utils.load_json(msg.payload))
+class SyncThread(mqtt.MqttThread):
+  def __init__(self, conf):
+    super(SyncThread, self).__init__()
+    self.app_config = conf
+    self.daemon = True
+    self.mqtt_config = conf['mqtt']
+    self.start_mqtt()
 
-def sync_mqtt(data):
-  mqtt_config = app.config['appconfig']['mqtt']
-  userdata = {
-    'subscribe_to': mqtt_config['topic']['mgmt']+'/status',
-    'status': data
-  }
-  mqtt_client = paho.Client(userdata=userdata)
-
-  mqtt.connect(mqtt_client, mqtt_config['server'])
-  mqtt_client.on_message = on_message
-
-  while True:
-    mqtt_client.loop()
+  def run(self):
+    while True:
+      self.mqtt.loop()
 
 
 def main():
@@ -175,10 +170,8 @@ def main():
 
   app.config['appconfig'] = api_config
 
-  manager = Manager().dict()
-  app.config['status'] = manager
-
-  Process(target=sync_mqtt, args=(manager,)).start()
+  app.config['sync'] = SyncThread(app.config['appconfig'])
+  app.config['sync'].start()
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)

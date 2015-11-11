@@ -1,6 +1,11 @@
 {
-  "mgmt_socket": "/tmp/mgw.sock",
-  "db": "/Users/zynzel/mgw/main/mgw.db",
+  "db": "/etc/mgw/mgw.db",
   "allowed_cidrs": ["127.0.0.1/24"],
-  "debug": 1
+  "debug": 1,
+  "mqtt": {
+    "server": "localhost",
+    "topic": {
+      "mgmt": "mgmt"
+    }
+  }
 }
