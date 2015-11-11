@@ -166,14 +166,18 @@ class MgwThread(mqtt.MqttThread):
     self.db_file = db_file
     self.mqtt_config = mqtt_config
     self.start_mqtt()
+    self.mqtt.db_file = db_file
 
 
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self.on_message_metric)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/serial', self.on_message_serial)
 
   def on_message_metric(self, client, userdata, msg):
+    if hasattr(client, 'db_file') and not hasattr(client, 'db'):
+       client.db = database.connect(client.db_file)
+
     sensor_data = utils.load_json(msg.payload)
-    self._save_sensors_data(sensor_data)
+    self._save_sensors_data(client.db, sensor_data)
     mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
 
   def on_message_serial(self, client, userdata, msg):
@@ -218,19 +222,19 @@ class MgwThread(mqtt.MqttThread):
 
     return data
 
-  def _save_sensors_data(self, data):
+  def _save_sensors_data(self, db, data):
     try:
-      self.db.execute(
+      db.execute(
         "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
         (data['board_id'], data['sensor_type'], data['sensor_data'])
       )
-      self.db.commit()
+      db.commit()
     except (sqlite3.IntegrityError) as e:
       LOG.error("Got exception '%' in mgw thread", e)
     except (sqlite3.OperationalError) as e:
       time.sleep(1 + random.random())
       try:
-        self.db.commit()
+        db.commit()
       except (sqlite3.OperationalError) as e:
         LOG.error("Got exception '%' in mgw thread", e)
 
@@ -250,7 +254,7 @@ class MgwThread(mqtt.MqttThread):
 
       LOG.debug("Got data from serial '%s'", sensor_data)
 
-      self._save_sensors_data(sensor_data)
+      self._save_sensors_data(self.db, sensor_data)
 
       mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
 

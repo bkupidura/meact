@@ -75,7 +75,7 @@ class MqttThread(threading.Thread):
     subscribe_to = []
 
     if self.name in topic:
-      subscribe_to.append(topic[self.name])
+      subscribe_to.append(topic[self.name]+'/#')
     if 'mgmt' in topic:
       subscribe_to.append(topic['mgmt']+'/status')
 
