@@ -7,6 +7,7 @@ import sqlite3
 import sys
 import threading
 import time
+import Queue
 import paho.mqtt.client as paho
 
 import serial
@@ -14,7 +15,6 @@ import serial
 from moteino_sensors import database
 from moteino_sensors import utils
 from moteino_sensors import mqtt
-from timeout_decorator import TimeoutError
 
 
 class ActionDetailsAdapter(dict):
@@ -43,6 +43,7 @@ class ExcThread(mqtt.MqttThread):
     self.sensors_map = sensors_map
     self.action_config = action_config
     self.mqtt_config = mqtt_config
+    self.action_queue = Queue.Queue()
 
     self.start_mqtt()
 
@@ -50,15 +51,7 @@ class ExcThread(mqtt.MqttThread):
 
   def on_message(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
-
-    #Todo: Check if sensor_data have proper format
-    sensor_type = sensor_data['sensor_type']
-    sensor_config = self.sensors_map.get(sensor_type)
-
-    board_id = str(sensor_data['board_id'])
-    sensor_data['board_desc'] = self.boards_map.get(board_id)
-
-    self.action_helper(sensor_data, sensor_config, self.action_config)
+    self.action_queue.put(sensor_data)
 
   def action_execute(self, data, actions, action_config):
     result = 0
@@ -74,24 +67,18 @@ class ExcThread(mqtt.MqttThread):
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      try:
-        status = action_func(data, conf)
-      except (TimeoutError) as e:
-        status = False
-      finally:
-        if not status:
-          LOG.error("Fail to execute action '%s'", action_name)
-          failback_actions = a.get('failback')
-          if failback_actions:
-            LOG.debug("Failback '%s'", failback_actions)
-            result += self.action_execute(data, failback_actions, action_config)
-        else:
-          result += 1
+      if not action_func(data, conf):
+        LOG.error("Fail to execute action '%s'", action_name)
+        failback_actions = a.get('failback')
+        if failback_actions:
+          LOG.debug("Failback '%s'", failback_actions)
+          result += self.action_execute(data, failback_actions, action_config)
+      else:
+        result += 1
 
     return result
 
   def action_helper(self, data, action_details, action_config=None):
-
     if not action_details or not action_details.get('action'):
       LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
       return
@@ -141,6 +128,19 @@ class ExcThread(mqtt.MqttThread):
     LOG.info('Starting')
     while True:
       self.mqtt.loop()
+      try:
+        sensor_data = self.action_queue.get(True, 5)
+      except (Queue.Empty) as e:
+        continue
+
+      #Todo: Check if sensor_data have proper format
+      sensor_type = sensor_data['sensor_type']
+      sensor_config = self.sensors_map.get(sensor_type)
+
+      board_id = str(sensor_data['board_id'])
+      sensor_data['board_desc'] = self.boards_map.get(board_id)
+
+      self.action_helper(sensor_data, sensor_config, self.action_config)
 
 
 class MgwThread(mqtt.MqttThread):
@@ -166,19 +166,15 @@ class MgwThread(mqtt.MqttThread):
     self.db_file = db_file
     self.mqtt_config = mqtt_config
     self.start_mqtt()
-    self.mqtt.db_file = db_file
+    self.sensor_queue = Queue.Queue()
 
 
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self.on_message_metric)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/serial', self.on_message_serial)
 
   def on_message_metric(self, client, userdata, msg):
-    if hasattr(client, 'db_file') and not hasattr(client, 'db'):
-       client.db = database.connect(client.db_file)
-
     sensor_data = utils.load_json(msg.payload)
-    self._save_sensors_data(client.db, sensor_data)
-    mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
+    self.sensor_queue.put(sensor_data)
 
   def on_message_serial(self, client, userdata, msg):
     data = utils.load_json(msg.payload)
@@ -222,19 +218,19 @@ class MgwThread(mqtt.MqttThread):
 
     return data
 
-  def _save_sensors_data(self, db, data):
+  def _save_sensors_data(self, data):
     try:
-      db.execute(
+      self.db.execute(
         "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
         (data['board_id'], data['sensor_type'], data['sensor_data'])
       )
-      db.commit()
+      self.db.commit()
     except (sqlite3.IntegrityError) as e:
       LOG.error("Got exception '%' in mgw thread", e)
     except (sqlite3.OperationalError) as e:
       time.sleep(1 + random.random())
       try:
-        db.commit()
+        self.db.commit()
       except (sqlite3.OperationalError) as e:
         LOG.error("Got exception '%' in mgw thread", e)
 
@@ -252,9 +248,16 @@ class MgwThread(mqtt.MqttThread):
       if not sensor_data:
         continue
 
+      #todo: rewrite reading->queue.put->queue.get
+      self.sensor_queue.put(sensor_data)
+      try:
+        sensor_data = self.sensor_queue.get(True, 5)
+      except (Queue.Empty) as e:
+        continue
+
       LOG.debug("Got data from serial '%s'", sensor_data)
 
-      self._save_sensors_data(self.db, sensor_data)
+      self._save_sensors_data(sensor_data)
 
       mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
 

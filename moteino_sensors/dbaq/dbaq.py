@@ -55,7 +55,7 @@ class MsdThread(DBQueryThread):
   def handle_result(self, board_id, value):
     now = int(time.time())
     data = {'board_id': board_id,
-            'sensor_data': now - value,
+            'sensor_data': str(now - value),
             'sensor_type': self.name}
     mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], data)
 
