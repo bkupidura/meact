@@ -71,12 +71,22 @@ class MqttThread(threading.Thread):
     if not hasattr(self, 'status'):
       self.status = {}
 
+    topic = self.mqtt_config.get('topic', {})
+    subscribe_to = []
+
+    if self.name in topic:
+      subscribe_to.append(topic[self.name])
+    if 'mgmt' in topic:
+      subscribe_to.append(topic['mgmt']+'/status')
+
     userdata = {
-      'subscribe_to': [self.mqtt_config['topic'][self.name], self.mqtt_config['topic']['mgmt']+'/status']
+      'subscribe_to': subscribe_to
     }
     self.mqtt = paho.Client(userdata=userdata)
     connect(self.mqtt, self.mqtt_config['server'])
-    self.mqtt.message_callback_add(self.mqtt_config['topic']['mgmt']+'/status', self.on_mgmt_status)
+
+    if 'mgmt' in topic:
+      self.mqtt.message_callback_add(topic['mgmt']+'/status', self.on_mgmt_status)
 
   def on_mgmt_status(self, client, userdata, msg):
     self.status = utils.load_json(msg.payload)
