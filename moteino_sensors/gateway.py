@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from multiprocessing import Process
+import Queue
 import argparse
 import logging
 import random
@@ -7,16 +9,13 @@ import sqlite3
 import sys
 import threading
 import time
-import Queue
-import paho.mqtt.client as paho
 
+import paho.mqtt.client as paho
 import serial
 
-from multiprocessing import Process
-
 from moteino_sensors import database
-from moteino_sensors import utils
 from moteino_sensors import mqtt
+from moteino_sensors import utils
 
 
 class ActionDetailsAdapter(dict):

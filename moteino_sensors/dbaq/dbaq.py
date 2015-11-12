@@ -1,14 +1,13 @@
 #!/usr/bin/env python
-import json
-import time
-import logging
-import argparse
-import threading
 import abc
+import argparse
+import logging
+import threading
+import time
 
-from moteino_sensors import utils
-from moteino_sensors import mqtt
 from moteino_sensors import database
+from moteino_sensors import mqtt
+from moteino_sensors import utils
 
 class DBQueryThread(mqtt.MqttThread):
   __metaclass__ = abc.ABCMeta

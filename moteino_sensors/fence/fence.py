@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-import requests
-import json
-import time
-import logging
 import argparse
+import json
+import logging
+import requests
 import threading
+import time
 
-from moteino_sensors import utils
 from moteino_sensors import mqtt
+from moteino_sensors import utils
 
 class FenceThread(mqtt.MqttThread):
   def __init__(self, conf):

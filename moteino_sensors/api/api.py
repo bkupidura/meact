@@ -7,12 +7,10 @@ import time
 import bottle
 import bottle.ext.sqlite
 import netaddr
-
 import paho.mqtt.client as paho
-from multiprocessing import Process, Manager
 
-from moteino_sensors import utils
 from moteino_sensors import mqtt
+from moteino_sensors import utils
 
 
 app = bottle.Bottle()

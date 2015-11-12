@@ -1,8 +1,9 @@
 import json
-import socket
-import time
 import logging
+import socket
 import threading
+import time
+
 import paho.mqtt.client as paho
 import paho.mqtt.publish as paho_publish
 
