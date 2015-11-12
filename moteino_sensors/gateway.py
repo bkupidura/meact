@@ -250,7 +250,7 @@ class MgwThread(mqtt.MqttThread):
     self.db = database.connect(self.db_file)
     self.mqtt.loop_start()
     self.mqtt._thread.setName(self.name+'-mqtt')
-    mqtt.publish(self.mqtt, self.mqtt_config['topic']['mgmt']+'/status', self.status, retain=True)
+    self.publish_status()
 
     while True:
       self.enabled.wait()

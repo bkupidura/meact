@@ -17,12 +17,6 @@ from moteino_sensors import mqtt
 
 app = bottle.Bottle()
 
-def update_status():
-  mqtt_config = app.config['appconfig']['mqtt']
-  topic = mqtt_config['topic']['mgmt']+'/status'
-  data = app.config['sync'].status
-  mqtt.single(topic, payload=data, retain=True, server=mqtt_config['server'])
-
 @app.hook('after_request')
 def after_request():
   bottle.response.headers['Access-Control-Allow-Origin'] = '*'
@@ -50,15 +44,14 @@ def static(filepath):
 
 @app.route('/api/action/status')
 def get_action_status():
-  return app.config['sync'].status
+  return app.config['mqtt'].status
 
 
 @app.route('/api/action/status', method=['POST'])
 def set_action_status():
   data = bottle.request.json
   if data:
-    app.config['sync'].status.update(data)
-    update_status()
+    app.config['mqtt'].publish_status(data)
 
 
 @app.route('/api/action/invert_status', method=['POST'])
@@ -69,8 +62,7 @@ def action_invert_status():
     cur_status = status.get(name)
     if cur_status is not None:
       inverted = not int(cur_status)
-      app.config['sync'].status.update({name: int(inverted)})
-      update_status()
+      app.config['mqtt'].publish_status({name: int(inverted)})
 
 
 @app.route('/api/node', method=['GET', 'POST'])
@@ -170,8 +162,8 @@ def main():
 
   app.config['appconfig'] = api_config
 
-  app.config['sync'] = SyncThread(app.config['appconfig'])
-  app.config['sync'].start()
+  app.config['mqtt'] = SyncThread(app.config['appconfig'])
+  app.config['mqtt'].start()
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)

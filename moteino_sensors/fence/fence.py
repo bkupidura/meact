@@ -55,14 +55,12 @@ class FenceThread(mqtt.MqttThread):
 
   def set_armed(self):
     self.status['armed'] = 1
-    self.update_status()
+    self.publish_status()
 
   def unset_armed(self):
     self.status['armed'] = 0
-    self.update_status()
+    self.publish_status()
 
-  def update_status(self):
-    mqtt.publish(self.mqtt, self.mqtt_config['topic']['mgmt']+'/status', self.status, retain=True)
 
 def api_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False):
   try:

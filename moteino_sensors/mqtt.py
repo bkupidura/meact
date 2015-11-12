@@ -88,6 +88,13 @@ class MqttThread(threading.Thread):
     if 'mgmt' in topic:
       self.mqtt.message_callback_add(topic['mgmt']+'/status', self.on_mgmt_status)
 
+  def publish_status(self, status=None):
+    topic = self.mqtt_config.get('topic', {})
+    if hasattr(self, 'status') and 'mgmt' in topic:
+      if status:
+        self.status.update(status)
+      publish(self.mqtt, topic['mgmt']+'/status', self.status, retain=True)
+
   def on_mgmt_status(self, client, userdata, msg):
     self.status = utils.load_json(msg.payload)
     if self.name in self.status and hasattr(self, 'enabled'):
