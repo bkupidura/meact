@@ -18,12 +18,33 @@ def load_config(config_name):
   return config
 
 
+def validate(data, schema):
+  v = Validator().validate(data, schema)
+  return v
+
+
 def validate_sensor_data(data):
   schema = {'board_id': {'type': 'string'},
             'sensor_type': {'type': 'string'},
             'sensor_data': {'type': 'string'}}
-  v = Validator().validate(data, schema)
-  return v
+  return validate(data, schema)
+
+
+def validate_action_details(data):
+  schema = {'action_interval': {'type': 'integer', 'min': 0},
+            'check_if_armed': {'type': 'dict', 'schema': {
+                'default': {'anyof':
+                    [{'type': 'integer', 'min': 0, 'max': 1},
+                     {'type': 'boolean'}]},
+                'except': {'type': 'list', 'schema': {'type': 'integer', 'min': 0, 'max': 255}}}},
+            'action': {'type': 'list', 'schema':
+                {'type': 'dict'}},
+            'threshold': {'type': 'string'},
+            'fail_count': {'type': 'integer', 'min': 0},
+            'message_template': {'type': 'string'},
+            'fail_interval': {'type': 'integer', 'min': 0}
+           }
+  return validate(data, schema)
 
 
 def create_logger(level, log_file=None):

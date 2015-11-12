@@ -103,6 +103,10 @@ class ExcThread(mqtt.MqttThread):
     action_details.setdefault('fail_interval', 600)
     action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
 
+    if not utils.validate_action_details(action_details):
+      LOG.warning("Fail to validate data '%s', ignoring..", action_details)
+      return
+
     action_details = ActionDetailsAdapter(action_details)
 
     LOG.debug("Action helper '%s' '%s'", data, action_details)
