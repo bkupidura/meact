@@ -21,8 +21,7 @@ class FenceThread(mqtt.MqttThread):
 
   def run(self):
     LOG.info('Starting')
-    self.mqtt.loop_start()
-    self.mqtt._thread.setName(self.name+'-mqtt')
+    self.loop_start()
     while True:
       self.enabled.wait()
       req = api_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))

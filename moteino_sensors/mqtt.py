@@ -46,7 +46,6 @@ def connect(client, server='localhost', port=1883, keepalive=60, retries=-1, use
 
 
 def on_connect(client, userdata, flags, rc):
-  LOG.info('Connected to broker')
   if 'subscribe_to' in userdata:
     subscribe(client, userdata['subscribe_to'])
 
@@ -87,6 +86,10 @@ class MqttThread(threading.Thread):
 
     if 'mgmt' in topic:
       self.mqtt.message_callback_add(topic['mgmt']+'/status', self.on_mgmt_status)
+
+  def loop_start(self):
+    self.mqtt.loop_start()
+    self.mqtt._thread.setName(self.name+'-mqtt')
 
   def publish_status(self, status=None):
     topic = self.mqtt_config.get('topic', {})

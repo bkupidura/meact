@@ -28,8 +28,7 @@ class DBQueryThread(mqtt.MqttThread):
 
   def run(self):
     LOG.info('Starting')
-    self.mqtt.loop_start()
-    self.mqtt._thread.setName(self.name+'-mqtt')
+    self.loop_start()
     self.db = database.connect(self.db_file)
     
     while True:

@@ -40,6 +40,8 @@ class ExcThread(mqtt.MqttThread):
     super(ExcThread, self).__init__()
     self.name = 'exc'
     self.daemon = True
+    self.enabled = threading.Event()
+    self.enabled.set()
     self.action_status = {}
     self.boards_map = boards_map
     self.sensors_map = sensors_map
@@ -137,8 +139,9 @@ class ExcThread(mqtt.MqttThread):
 
   def run(self):
     LOG.info('Starting')
+    self.loop_start()
     while True:
-      self.mqtt.loop()
+      self.enabled.wait()
       try:
         sensor_data = self.action_queue.get(True, 5)
       except (Queue.Empty) as e:
@@ -162,6 +165,7 @@ class MgwThread(mqtt.MqttThread):
   status = {
     'mgw': 1,
     'msd': 1,
+    'exc': 1,
     'armed': 1,
     'fence': 1
   }
@@ -227,7 +231,8 @@ class MgwThread(mqtt.MqttThread):
       if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
         self.ping_gateway()
 
-    return data
+    if data:
+      self.sensor_queue.put(data)
 
   def _save_sensors_data(self, data):
     try:
@@ -248,25 +253,20 @@ class MgwThread(mqtt.MqttThread):
   def run(self):
     LOG.info('Starting')
     self.db = database.connect(self.db_file)
-    self.mqtt.loop_start()
-    self.mqtt._thread.setName(self.name+'-mqtt')
+    self.loop_start()
     self.publish_status()
 
     while True:
       self.enabled.wait()
 
-      sensor_data = self._read_sensors_data()
-      if not sensor_data:
-        continue
+      self._read_sensors_data()
 
-      #todo: rewrite reading->queue.put->queue.get
-      self.sensor_queue.put(sensor_data)
       try:
         sensor_data = self.sensor_queue.get(True, 5)
       except (Queue.Empty) as e:
         continue
 
-      LOG.debug("Got data from serial '%s'", sensor_data)
+      LOG.debug("Got data from queue '%s'", sensor_data)
 
       self._save_sensors_data(sensor_data)
 
