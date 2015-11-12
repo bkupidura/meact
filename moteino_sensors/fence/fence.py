@@ -26,12 +26,12 @@ class FenceThread(mqtt.MqttThread):
       self.enabled.wait()
       req = api_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))
       if req:
-        self.check_action(req)
+        self._check_action(req)
       elif self.status.get('armed') == 0:
-        self.set_armed()
+        self._set_armed()
       time.sleep(self.conf['loop_time'])
 
-  def check_action(self, data):
+  def _check_action(self, data):
     status = {
       'enter': 0,
       'exit': 0,
@@ -47,16 +47,16 @@ class FenceThread(mqtt.MqttThread):
     armed = self.status.get('armed')
     if (armed == 1) and (status['enter'] > 0):
       LOG.info('Disarm alarm')
-      self.unset_armed()
+      self._unset_armed()
     elif (armed == 0) and (status['exit'] == len(self.conf['geo_devices'])):
       LOG.info('Arm alarm')
-      self.set_armed()
+      self._set_armed()
 
-  def set_armed(self):
+  def _set_armed(self):
     self.status['armed'] = 1
     self.publish_status()
 
-  def unset_armed(self):
+  def _unset_armed(self):
     self.status['armed'] = 0
     self.publish_status()
 

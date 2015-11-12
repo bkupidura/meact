@@ -3,6 +3,7 @@ import logging
 import os
 import pkgutil
 import sys
+from cerberus import Validator
 
 from moteino_sensors import actions
 
@@ -14,6 +15,14 @@ def load_config(config_name):
     config = json.load(json_config)
 
   return config
+
+
+def validate_sensor_data(data):
+  schema = {'board_id': {'type': 'string'},
+            'sensor_type': {'type': 'string'},
+            'sensor_data': {'type': 'string'}}
+  v = Validator().validate(data, schema)
+  return v
 
 
 def create_logger(level, log_file=None):

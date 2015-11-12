@@ -35,23 +35,23 @@ class DBQueryThread(mqtt.MqttThread):
       self.enabled.wait()
 
       result = self.db.execute(self.query)
-      self.handle_query_result(result)
+      self._handle_query_result(result)
 
       time.sleep(self.loop_sleep)
 
-  def handle_query_result(self, query_result):
+  def _handle_query_result(self, query_result):
       for board_id, value in query_result:
-        self.handle_result(board_id, value)
+        self._handle_result(board_id, value)
 
   @abc.abstractmethod
-  def handle_result(self, board_id, value):
+  def _handle_result(self, board_id, value):
     pass
 
 class MsdThread(DBQueryThread):
 
   name = 'msd'
 
-  def handle_result(self, board_id, value):
+  def _handle_result(self, board_id, value):
     now = int(time.time())
     data = {'board_id': board_id,
             'sensor_data': str(now - value),

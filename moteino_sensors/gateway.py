@@ -51,13 +51,13 @@ class ExcThread(mqtt.MqttThread):
 
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name], self.on_message)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name], self._on_message)
 
-  def on_message(self, client, userdata, msg):
+  def _on_message(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
     self.action_queue.put(sensor_data)
 
-  def action_execute(self, data, actions, action_config):
+  def _action_execute(self, data, actions, action_config):
     result = 0
 
     for a in actions:
@@ -91,7 +91,7 @@ class ExcThread(mqtt.MqttThread):
 
     return result
 
-  def action_helper(self, data, action_details, action_config=None):
+  def _action_helper(self, data, action_details, action_config=None):
     if not action_details or not action_details.get('action'):
       LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
       return
@@ -134,7 +134,7 @@ class ExcThread(mqtt.MqttThread):
     if (now - self.action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
       return
 
-    if self.action_execute(data, action_details['action'], action_config):
+    if self._action_execute(data, action_details['action'], action_config):
       self.action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
   def run(self):
@@ -147,14 +147,17 @@ class ExcThread(mqtt.MqttThread):
       except (Queue.Empty) as e:
         continue
 
-      #Todo: Check if sensor_data have proper format
+      if not utils.validate_sensor_data(sensor_data):
+        LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
+        continue
+
       sensor_type = sensor_data['sensor_type']
       sensor_config = self.sensors_map.get(sensor_type)
 
-      board_id = str(sensor_data['board_id'])
+      board_id = sensor_data['board_id']
       sensor_data['board_desc'] = self.boards_map.get(board_id)
 
-      self.action_helper(sensor_data, sensor_config, self.action_config)
+      self._action_helper(sensor_data, sensor_config, self.action_config)
 
 
 class MgwThread(mqtt.MqttThread):
@@ -184,14 +187,14 @@ class MgwThread(mqtt.MqttThread):
     self.sensor_queue = Queue.Queue()
 
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self.on_message_metric)
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/serial', self.on_message_serial)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/serial', self._on_message_serial)
 
-  def on_message_metric(self, client, userdata, msg):
+  def _on_message_metric(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
     self.sensor_queue.put(sensor_data)
 
-  def on_message_serial(self, client, userdata, msg):
+  def _on_message_serial(self, client, userdata, msg):
     data = utils.load_json(msg.payload)
 
     try:
@@ -200,7 +203,7 @@ class MgwThread(mqtt.MqttThread):
     except (IOError, ValueError, serial.serialutil.SerialException) as e:
       LOG.error("Got exception '%s' in mgmt thread", e)
 
-  def ping_gateway(self):
+  def _ping_gateway(self):
     try:
       self.serial.write('1:1')
       time.sleep(1)
@@ -229,7 +232,7 @@ class MgwThread(mqtt.MqttThread):
         LOG.debug('> %s', s_data)
     finally:
       if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
-        self.ping_gateway()
+        self._ping_gateway()
 
     if data:
       self.sensor_queue.put(data)
@@ -264,6 +267,10 @@ class MgwThread(mqtt.MqttThread):
       try:
         sensor_data = self.sensor_queue.get(True, 5)
       except (Queue.Empty) as e:
+        continue
+
+      if not utils.validate_sensor_data(sensor_data):
+        LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
         continue
 
       LOG.debug("Got data from queue '%s'", sensor_data)
