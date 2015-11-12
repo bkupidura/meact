@@ -1,8 +1,10 @@
 import logging
 import requests
+import sys
 
 
 LOG = logging.getLogger(__name__)
+TIMEOUT=5
 
 
 logging.getLogger("requests").setLevel(logging.CRITICAL)
@@ -10,7 +12,7 @@ requests.packages.urllib3.disable_warnings()
 
 def send_sms(data, action_config):
   if not action_config.get('enabled'):
-    return False
+    sys.exit(1)
 
   LOG.info('Sending SMS')
 
@@ -27,11 +29,11 @@ def send_sms(data, action_config):
     r.raise_for_status()
   except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
     LOG.warning("Got exception '%s' in send_sms", e)
-    return False
+    sys.exit(2)
 
   result = r.text.split('|')
   if result[0] != '0':
     LOG.warning("Fail in send_sms '%s' '%s'", result[0], result[1])
-    return False
+    sys.exit(2)
 
-  return True
+  sys.exit(0)

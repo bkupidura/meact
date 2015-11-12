@@ -12,6 +12,8 @@ import paho.mqtt.client as paho
 
 import serial
 
+from multiprocessing import Process
+
 from moteino_sensors import database
 from moteino_sensors import utils
 from moteino_sensors import mqtt
@@ -67,8 +69,17 @@ class ExcThread(mqtt.MqttThread):
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      if not action_func(data, conf):
-        LOG.error("Fail to execute action '%s'", action_name)
+      p = Process(target=action_func.get('func'), args=(data, conf))
+      p.start()
+      p.join(action_func.get('timeout'))
+      if p.is_alive():
+        p.terminate()
+        status = 255
+      else:
+        status = p.exitcode
+
+      if status:
+        LOG.error("Fail to execute action '%s', exitcode '%d'", action_name, status)
         failback_actions = a.get('failback')
         if failback_actions:
           LOG.debug("Failback '%s'", failback_actions)
