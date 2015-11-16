@@ -91,8 +91,8 @@ class ExcThread(mqtt.MqttThread):
     return result
 
   def _action_helper(self, data, action_details, action_config=None):
-    if not action_details or not action_details.get('action'):
-      LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
+    if not action_details:
+      LOG.debug("Missing sensor_map for sensor_type '%s'", data['sensor_type'])
       return
 
     action_details.setdefault('check_if_armed', {'default': True})

@@ -33,26 +33,28 @@ class ActionValidator(Validator):
 
 
 def validate_sensor_data(data):
-  schema = {'board_id': {'type': 'string'},
-            'sensor_type': {'type': 'string'},
-            'sensor_data': {'type': 'string'}}
+  schema = {'board_id': {'required': True, 'empty': False, 'type': 'string'},
+            'sensor_type': {'required': True, 'empty': False, 'type': 'string'},
+            'sensor_data': {'required': True, 'empty': False, 'type': 'string'}}
   v = Validator()
   return v.validate(data, schema)
 
 
 def validate_action_details(data):
-  schema = {'action_interval': {'type': 'integer', 'min': 0},
-            'check_if_armed': {'type': 'dict', 'schema': {
-                'default': {'anyof':
+  schema = {'action_interval': {'required': True, 'type': 'integer', 'min': 0},
+            'check_if_armed': {'required': True, 'type': 'dict', 'schema': {
+                'default': {'required': True, 'anyof':
                     [{'type': 'integer', 'min': 0, 'max': 1},
                      {'type': 'boolean'}]},
-                'except': {'type': 'list', 'schema': {'type': 'integer', 'min': 0, 'max': 255}}}},
-            'action': {'type': 'list', 'schema':
-                {'type': 'dict', 'isaction': True}},
-            'threshold': {'type': 'string'},
-            'fail_count': {'type': 'integer', 'min': 0},
-            'message_template': {'type': 'string'},
-            'fail_interval': {'type': 'integer', 'min': 0}
+                'except': {'required': True, 'type': 'list', 'schema':
+                    {'empty': False, 'type': 'string'}}}},
+            'action': {'required': True, 'type': 'list', 'schema':
+                {'isaction': True, 'type': 'dict'},
+                'noneof': [{'type': 'list', 'items': []}]},
+            'threshold': {'required': True, 'empty': False, 'type': 'string'},
+            'fail_count': {'required': True, 'type': 'integer', 'min': 0},
+            'message_template': {'required': True, 'empty': False, 'type': 'string'},
+            'fail_interval': {'required': True, 'type': 'integer', 'min': 0}
             }
   v = ActionValidator()
   return v.validate(data, schema)
