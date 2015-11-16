@@ -39,10 +39,10 @@ class FenceThread(mqtt.MqttThread):
     for device in data:
       action = data[device]['action']
       if device in self.conf['geo_devices']:
-        try:
-          status[action] += 1
-        except (KeyError):
-          pass
+        if self.conf['enter_status'] == action:
+          status['enter'] += 1
+        elif self.conf['exit_status'] == action:
+          status['exit'] += 1
 
     armed = self.status.get('armed')
     if (armed == 1) and (status['enter'] > 0):

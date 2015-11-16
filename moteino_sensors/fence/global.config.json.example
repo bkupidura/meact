@@ -3,6 +3,8 @@
   "geo_user": "user",
   "geo_pass": "password",
   "geo_devices": ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"],
+  "enter_status": "entered",
+  "exit_status": "exited",
   "loop_time": 30,
   "mqtt": {
     "server": "localhost",
