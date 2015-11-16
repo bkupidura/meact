@@ -267,7 +267,7 @@ class MgwThread(mqtt.MqttThread):
 
       self._save_sensors_data(sensor_data)
 
-      mqtt.publish(self.mqtt, self.mqtt_config['topic']['exc'], sensor_data)
+      self.publish(self.mqtt_config['topic']['exc'], sensor_data)
 
 
 LOG = logging.getLogger(__name__)
