@@ -176,14 +176,12 @@ class MgwThread(mqtt.MqttThread):
     'fence': 1
   }
 
-  def __init__(self, serial, gateway_ping_time, db_file, mqtt_config):
+  def __init__(self, serial, db_file, mqtt_config):
     super(MgwThread, self).__init__()
     self.name = 'mgw'
     self.enabled = threading.Event()
     self.enabled.set()
     self.serial = serial
-    self.last_gw_ping = 0
-    self.gateway_ping_time = gateway_ping_time
     self.db_file = db_file
     self.mqtt_config = mqtt_config
     self.start_mqtt()
@@ -199,21 +197,13 @@ class MgwThread(mqtt.MqttThread):
 
   def _on_message_serial(self, client, userdata, msg):
     data = utils.load_json(msg.payload)
+    LOG.debug("Got data for node '%s'", data)
 
     try:
-      r_cmd = "{nodeid}:{cmd}".format(**data['data'])
+      r_cmd = "{nodeid}:{cmd}".format(**data)
       self.serial.write(r_cmd)
     except (IOError, ValueError, serial.serialutil.SerialException) as e:
       LOG.error("Got exception '%s' in mgmt thread", e)
-
-  def _ping_gateway(self):
-    try:
-      self.serial.write('1:1')
-      time.sleep(1)
-    except (IOError, ValueError, serial.serialutil.SerialException) as e:
-      LOG.error("Got exception '%' in ping_gateway", e)
-    else:
-      self.last_gw_ping = int(time.time())
 
   def _read_sensors_data(self):
     data = {}
@@ -233,9 +223,6 @@ class MgwThread(mqtt.MqttThread):
     except (AttributeError) as e:
       if len(s_data) > 0:
         LOG.debug('> %s', s_data)
-    finally:
-      if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
-        self._ping_gateway()
 
     if data:
       self.sensor_queue.put(data)
@@ -318,7 +305,6 @@ def main():
   )
   mgw = MgwThread(
     serial=ser,
-    gateway_ping_time=conf['gateway_ping_time'],
     db_file=conf['db_file'],
     mqtt_config=conf['mqtt'])
 
