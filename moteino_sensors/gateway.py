@@ -84,7 +84,7 @@ class ExcThread(mqtt.MqttThread):
         failback_actions = a.get('failback')
         if failback_actions:
           LOG.debug("Failback '%s'", failback_actions)
-          result += self.action_execute(data, failback_actions, action_config)
+          result += self._action_execute(data, failback_actions, action_config)
       else:
         result += 1
 

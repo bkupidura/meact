@@ -4,7 +4,7 @@ import os
 import pkgutil
 import sys
 
-from cerberus import Validator
+from cerberus import Validator, cerberus
 
 from moteino_sensors import actions
 
@@ -18,16 +18,26 @@ def load_config(config_name):
   return config
 
 
-def validate(data, schema):
-  v = Validator().validate(data, schema)
-  return v
+class ActionValidator(Validator):
+  def _validate_action(self, field, value):
+      if not isinstance(value.get('name'), cerberus._str_type):
+        self._error(field, "Must be action")
+      failback = value.get('failback')
+      if failback:
+        for f in failback:
+          self._validate_action(field, f)
+
+  def _validate_isaction(self, isaction, field, value):
+    if isaction:
+      self._validate_action(field, value)
 
 
 def validate_sensor_data(data):
   schema = {'board_id': {'type': 'string'},
             'sensor_type': {'type': 'string'},
             'sensor_data': {'type': 'string'}}
-  return validate(data, schema)
+  v = Validator()
+  return v.validate(data, schema)
 
 
 def validate_action_details(data):
@@ -38,13 +48,14 @@ def validate_action_details(data):
                      {'type': 'boolean'}]},
                 'except': {'type': 'list', 'schema': {'type': 'integer', 'min': 0, 'max': 255}}}},
             'action': {'type': 'list', 'schema':
-                {'type': 'dict'}},
+                {'type': 'dict', 'isaction': True}},
             'threshold': {'type': 'string'},
             'fail_count': {'type': 'integer', 'min': 0},
             'message_template': {'type': 'string'},
             'fail_interval': {'type': 'integer', 'min': 0}
-           }
-  return validate(data, schema)
+            }
+  v = ActionValidator()
+  return v.validate(data, schema)
 
 
 def create_logger(level, log_file=None):
