@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import json
 import logging
 import os
@@ -74,6 +75,11 @@ def create_logger(level, log_file=None):
   handler.setFormatter(formatter)
   logger.addHandler(handler)
 
+
+def create_arg_parser(description):
+  parser = ArgumentParser(description=description)
+  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  return parser
 
 def load_json(data):
   try:

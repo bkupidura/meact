@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import abc
-import argparse
 import logging
 import threading
 import time
@@ -62,8 +61,7 @@ LOG = logging.getLogger(__name__)
 
 
 def main():
-  parser = argparse.ArgumentParser(description='DBAQ - database asynchronous query')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('DBAQ - database asynchronous query')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')

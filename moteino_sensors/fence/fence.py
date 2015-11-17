@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import argparse
 import json
 import logging
 import requests
@@ -78,8 +77,7 @@ LOG = logging.getLogger(__name__)
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Fence')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('Fence')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')

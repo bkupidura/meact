@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import argparse
 import json
 import os
 import time
@@ -146,8 +145,7 @@ class SyncThread(mqtt.MqttThread):
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Moteino gateway API')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('Moteino gateway API')
   args = parser.parse_args()
 
   api_config = utils.load_config(args.dir + '/global.config.json')

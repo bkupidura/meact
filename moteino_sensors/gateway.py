@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from multiprocessing import Process
 import Queue
-import argparse
 import logging
 import random
 import sqlite3
@@ -213,8 +212,7 @@ LOG = logging.getLogger(__name__)
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Moteino gateway')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('Moteino gateway')
   parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
   parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
