@@ -2,6 +2,7 @@ import logging
 import time
 import sys
 from gsmmodem.modem import GsmModem, SentSms
+from gsmmodem.exceptions import TimeoutException
 
 
 LOG = logging.getLogger(__name__)

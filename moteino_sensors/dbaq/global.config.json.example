@@ -8,7 +8,7 @@
     "server": "localhost",
     "topic": {
       "mgmt": "mgmt",
-      "exc": "exc"
+      "mgw": "mgw"
     }
   }
 }

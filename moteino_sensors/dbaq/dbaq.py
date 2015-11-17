@@ -55,7 +55,7 @@ class MsdThread(DBQueryThread):
     data = {'board_id': board_id,
             'sensor_data': str(now - value),
             'sensor_type': self.name}
-    self.publish(self.mqtt_config['topic']['exc'], data)
+    self.publish(self.mqtt_config['topic']['mgw']+"/action", data)
 
 
 LOG = logging.getLogger(__name__)

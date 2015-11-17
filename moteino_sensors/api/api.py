@@ -7,7 +7,6 @@ import time
 import bottle
 import bottle.ext.sqlite
 import netaddr
-import paho.mqtt.client as paho
 
 from moteino_sensors import mqtt
 from moteino_sensors import utils

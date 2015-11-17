@@ -2,11 +2,6 @@
   "logging": {
     "level": 20
   },
-  "serial": {
-    "device": "/dev/ttyUSB0",
-    "speed": 115200,
-    "timeout": 20
-  },
   "action_config": {
     "send_sms": {
       "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
@@ -35,7 +30,6 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "exc": "exc",
       "mgw": "mgw",
       "mgmt": "mgmt"
     }

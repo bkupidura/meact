@@ -1,0 +1,15 @@
+{
+  "serial": {
+    "device": "/dev/ttyUSB0",
+    "speed": 115200,
+    "timeout": 20
+  },
+  "mqtt": {
+    "server": "localhost",
+    "topic": {
+      "mgmt": "mgmt",
+      "mgw": "mgw",
+      "srl": "srl"
+    }
+  }
+}
