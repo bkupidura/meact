@@ -62,30 +62,71 @@ class MgwThread(mqtt.MqttThread):
     if not self._db:
       self._db = database.connect(self.db_file)
 
-    if self._put_in_queue(sensor_data):
-      self._save_sensors_data(sensor_data)
+    sensor_data, sensor_config = self._prepare_data(sensor_data)
+
+    self._save_sensors_data(sensor_data)
+    self._put_in_queue(sensor_data, sensor_config)
 
   def _on_message_action(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
-    self._put_in_queue(sensor_data)
 
-  def _put_in_queue(self, data):
-    if not utils.validate_sensor_data(data):
-      LOG.warning("Fail to validate data '%s', ignoring..", data)
-      return False
+    sensor_data, sensor_config = self._prepare_data(sensor_data)
 
-    sensor_type = data['sensor_type']
-    sensor_config = self._prepare_action_details(sensor_type)
-    priority = sensor_config.get('priority', 500)
+    self._put_in_queue(sensor_data, sensor_config)
 
-    self.action_queue.put((priority, data, sensor_config))
-    return True
+  def _save_sensors_data(self, sensor_data):
+    if not sensor_data:
+      return
 
-  def _prepare_action_details(self, sensor_type):
+    try:
+      self._db.execute(
+        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
+        (sensor_data['board_id'], sensor_data['sensor_type'], sensor_data['sensor_data'])
+      )
+      self._db.commit()
+    except (sqlite3.IntegrityError) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+    except (sqlite3.OperationalError) as e:
+      time.sleep(1 + random.random())
+      try:
+        self._db.commit()
+      except (sqlite3.OperationalError) as e:
+        LOG.error("Got exception '%' in mgw thread", e)
+
+  def _put_in_queue(self, sensor_data, sensor_config):
+    if not sensor_data or not sensor_config:
+      return
+
+    priority = sensor_config['priority']
+
+    self.action_queue.put((priority, sensor_data, sensor_config))
+
+  def _prepare_data(self, sensor_data):
+    sensor_data = self._prepare_sensor_data(sensor_data)
+    sensor_config = self._prepare_action_details(sensor_data)
+
+    return sensor_data, sensor_config
+
+  def _prepare_sensor_data(self, sensor_data):
+    if not utils.validate_sensor_data(sensor_data):
+      LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
+      return None
+
+    board_id = sensor_data['board_id']
+    sensor_data['board_desc'] = self.boards_map.get(board_id)
+
+    return sensor_data
+
+  def _prepare_action_details(self, sensor_data):
+    if not sensor_data:
+      return None
+
+    sensor_type = sensor_data.get('sensor_type')
     action_details = self.sensors_map.get(sensor_type)
+
     if not action_details:
       LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
-      return {}
+      return None
 
     action_details.setdefault('check_if_armed', {'default': True})
     action_details['check_if_armed'].setdefault('except', [])
@@ -98,25 +139,9 @@ class MgwThread(mqtt.MqttThread):
 
     if not utils.validate_action_details(action_details):
       LOG.warning("Fail to validate data '%s', ignoring..", action_details)
-      return {}
+      return None
 
     return action_details
-
-  def _save_sensors_data(self, data):
-    try:
-      self._db.execute(
-        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
-        (data['board_id'], data['sensor_type'], data['sensor_data'])
-      )
-      self._db.commit()
-    except (sqlite3.IntegrityError) as e:
-      LOG.error("Got exception '%' in mgw thread", e)
-    except (sqlite3.OperationalError) as e:
-      time.sleep(1 + random.random())
-      try:
-        self._db.commit()
-      except (sqlite3.OperationalError) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
 
   def _action_execute(self, data, actions, action_config):
     result = 0
@@ -153,8 +178,6 @@ class MgwThread(mqtt.MqttThread):
     return result
 
   def _action_helper(self, data, action_details, action_config=None):
-    if not action_details:
-      return
 
     action_details = ActionDetailsAdapter(action_details)
 
@@ -201,9 +224,6 @@ class MgwThread(mqtt.MqttThread):
         continue
 
       LOG.debug("Got sensor_data '%s' with priority '%d'", sensor_data, priority)
-
-      board_id = sensor_data['board_id']
-      sensor_data['board_desc'] = self.boards_map.get(board_id)
 
       self._action_helper(sensor_data, sensor_config, self.action_config)
 
