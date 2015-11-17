@@ -55,7 +55,7 @@ def validate_action_details(data):
             'fail_count': {'required': True, 'type': 'integer', 'min': 0},
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
             'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'priority': {'type': 'integer', 'min': 0}
+            'priority': {'required': True, 'type': 'integer', 'min': 0}
             }
   v = ActionValidator()
   return v.validate(data, schema)

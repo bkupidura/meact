@@ -76,12 +76,32 @@ class MgwThread(mqtt.MqttThread):
       return False
 
     sensor_type = data['sensor_type']
-    sensor_map = self.sensors_map.get(sensor_type, {})
-    priority = sensor_map.get('priority', 500)
+    sensor_config = self._prepare_action_details(sensor_type)
+    priority = sensor_config.get('priority', 500)
 
-
-    self.action_queue.put((priority, data))
+    self.action_queue.put((priority, data, sensor_config))
     return True
+
+  def _prepare_action_details(self, sensor_type):
+    action_details = self.sensors_map.get(sensor_type)
+    if not action_details:
+      LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
+      return {}
+
+    action_details.setdefault('check_if_armed', {'default': True})
+    action_details['check_if_armed'].setdefault('except', [])
+    action_details.setdefault('action_interval', 0)
+    action_details.setdefault('threshold', 'lambda x: True')
+    action_details.setdefault('fail_count', 0)
+    action_details.setdefault('fail_interval', 600)
+    action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+    action_details.setdefault('priority', 500)
+
+    if not utils.validate_action_details(action_details):
+      LOG.warning("Fail to validate data '%s', ignoring..", action_details)
+      return {}
+
+    return action_details
 
   def _save_sensors_data(self, data):
     try:
@@ -135,19 +155,6 @@ class MgwThread(mqtt.MqttThread):
 
   def _action_helper(self, data, action_details, action_config=None):
     if not action_details:
-      LOG.debug("Missing sensor_map for sensor_type '%s'", data['sensor_type'])
-      return
-
-    action_details.setdefault('check_if_armed', {'default': True})
-    action_details['check_if_armed'].setdefault('except', [])
-    action_details.setdefault('action_interval', 0)
-    action_details.setdefault('threshold', 'lambda x: True')
-    action_details.setdefault('fail_count', 0)
-    action_details.setdefault('fail_interval', 600)
-    action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-
-    if not utils.validate_action_details(action_details):
-      LOG.warning("Fail to validate data '%s', ignoring..", action_details)
       return
 
     action_details = ActionDetailsAdapter(action_details)
@@ -190,13 +197,11 @@ class MgwThread(mqtt.MqttThread):
     while True:
       self.enabled.wait()
       try:
-        priority, sensor_data = self.action_queue.get(True, 5)
+        priority, sensor_data, sensor_config = self.action_queue.get(True, 5)
       except (Queue.Empty) as e:
         continue
 
       LOG.debug("Got sensor_data '%s' with priority '%d'", sensor_data, priority)
-      sensor_type = sensor_data['sensor_type']
-      sensor_config = self.sensors_map.get(sensor_type)
 
       board_id = sensor_data['board_id']
       sensor_data['board_desc'] = self.boards_map.get(board_id)
