@@ -50,7 +50,7 @@ class MgwThread(mqtt.MqttThread):
     self.sensors_map = sensors_map
     self.action_config = action_config
     self.mqtt_config = mqtt_config
-    self.action_queue = Queue.Queue()
+    self.action_queue = Queue.PriorityQueue()
 
     self.start_mqtt()
 
@@ -63,16 +63,25 @@ class MgwThread(mqtt.MqttThread):
     if not self._db:
       self._db = database.connect(self.db_file)
 
-    if not utils.validate_sensor_data(sensor_data):
-      LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
-      return
-
-    self._save_sensors_data(sensor_data)
-    self.action_queue.put(sensor_data)
+    if self._put_in_queue(sensor_data):
+      self._save_sensors_data(sensor_data)
 
   def _on_message_action(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
-    self.action_queue.put(sensor_data)
+    self._put_in_queue(sensor_data)
+
+  def _put_in_queue(self, data):
+    if not utils.validate_sensor_data(data):
+      LOG.warning("Fail to validate data '%s', ignoring..", data)
+      return False
+
+    sensor_type = data['sensor_type']
+    sensor_map = self.sensors_map.get(sensor_type, {})
+    priority = sensor_map.get('priority', 500)
+
+
+    self.action_queue.put((priority, data))
+    return True
 
   def _save_sensors_data(self, data):
     try:
@@ -181,14 +190,11 @@ class MgwThread(mqtt.MqttThread):
     while True:
       self.enabled.wait()
       try:
-        sensor_data = self.action_queue.get(True, 5)
+        priority, sensor_data = self.action_queue.get(True, 5)
       except (Queue.Empty) as e:
         continue
 
-      if not utils.validate_sensor_data(sensor_data):
-        LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
-        continue
-
+      LOG.debug("Got sensor_data '%s' with priority '%d'", sensor_data, priority)
       sensor_type = sensor_data['sensor_type']
       sensor_config = self.sensors_map.get(sensor_type)
 

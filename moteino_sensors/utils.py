@@ -54,7 +54,8 @@ def validate_action_details(data):
             'threshold': {'required': True, 'empty': False, 'type': 'string'},
             'fail_count': {'required': True, 'type': 'integer', 'min': 0},
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
-            'fail_interval': {'required': True, 'type': 'integer', 'min': 0}
+            'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
+            'priority': {'type': 'integer', 'min': 0}
             }
   v = ActionValidator()
   return v.validate(data, schema)
