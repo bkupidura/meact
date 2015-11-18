@@ -1,23 +1,16 @@
 #!/usr/bin/env python
-import abc
-import argparse
-import json
+from multiprocessing import Process
+import Queue
 import logging
-import os
 import random
-import re
-import socket
 import sqlite3
 import sys
 import threading
 import time
-import Queue
-
-import serial
 
 from moteino_sensors import database
+from moteino_sensors import mqtt
 from moteino_sensors import utils
-from timeout_decorator import TimeoutError
 
 
 class ActionDetailsAdapter(dict):
@@ -35,159 +28,122 @@ class ActionDetailsAdapter(dict):
     )
 
 
-class mgmt_Thread(threading.Thread):
-  def __init__(self, conf, boards_map, sensors_map):
-    super(mgmt_Thread, self).__init__()
-    self.name = 'mgmt'
+class MgwThread(mqtt.MqttThread):
+  status = {
+    'mgw': 1,
+    'msd': 1,
+    'srl': 1,
+    'armed': 1,
+    'fence': 1
+  }
 
-    self.socket = conf['mgmt_socket']
-    self.serial = serial.Serial(
-      conf['serial']['device'],
-      conf['serial']['speed'],
-      timeout=conf['serial']['timeout']
-    )
-
-    # Missing sensor detector thread
-    self.msd = msd_Thread(
-      loop_sleep=conf['msd']['loop_sleep'],
-      db_file=conf['db_file'],
-      query=conf['msd']['query'])
-
-    self.mgw = mgw_Thread(
-      serial=self.serial,
-      loop_sleep=conf['loop_sleep'],
-      gateway_ping_time=conf['gateway_ping_time'],
-      db_file=conf['db_file'])
-
-    self.exc = exc_Thread(boards_map=boards_map,
-      sensors_map=sensors_map,
-      action_config=conf['action_config'])
-
-  def handle_action(self, data):
-    if 'action' not in data:
-      LOG.debug('No action to handle')
-
-    if data['action'] == 'status':
-      return STATUS
-
-    if data['action'] == 'send' and 'data' in data:
-      try:
-        r_cmd = "{nodeid}:{cmd}".format(**data['data'])
-        self.serial.write(r_cmd)
-      except (IOError, ValueError, serial.serialutil.SerialException) as e:
-        LOG.error("Got exception '%s' in mgmt thread", e)
-
-    if data['action'] == 'set' and 'data' in data:
-      STATUS.update(data['data'])
-
-      if 'mgw' in data['data']:
-        self.mgw.enabled.set() if data['data']['mgw'] else self.mgw.enabled.clear()
-      if 'msd' in data['data']:
-        self.msd.enabled.set() if data['data']['msd'] else self.msd.enabled.clear()
-      if 'exc' in data['data']:
-        self.exc.enabled.set() if data['data']['exc'] else self.exc.enabled.clear()
-
-  def run(self):
-    LOG.info('Starting')
-
-    self.msd.start()
-    self.mgw.start()
-    self.exc.start()
-
-    if os.path.exists(self.socket):
-      os.remove(self.socket)
-
-    # TODO(prmtl): write a socket server class that will abstract this?
-    self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    self.server.bind(self.socket)
-    self.server.listen(1)
-
-    while True:
-      # TODO(prmtl): check if we can do it onece
-      conn, addr = self.server.accept()
-      data = conn.recv(1024)
-
-      LOG.debug("Got '%s' on mgmt socket", data)
-
-      if not data:
-        continue
-
-      try:
-        data = json.loads(data)
-      except (ValueError) as e:
-        LOG.warning("Cannot decode recieved data in mgmt thread: %s", e)
-        continue
-
-      response = self.handle_action(data)
-      if response:
-        conn.send(json.dumps(response))
-
-      conn.close()
-
-
-class DBQueryThread(threading.Thread):
-  __metaclass__ = abc.ABCMeta
-
-  name = None
-
-  def __init__(self, loop_sleep, db_file, query):
-    super(DBQueryThread, self).__init__()
-    self.daemon = True
+  def __init__(self, db_file, boards_map, sensors_map, action_config, mqtt_config):
+    super(MgwThread, self).__init__()
+    self.name = 'mgw'
     self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
-    self.loop_sleep = loop_sleep
-    self.db_file = db_file
-    self.query = query
-
-  def run(self):
-    LOG.info('Starting')
-    self.db = database.connect(self.db_file)
-    while True:
-      self.enabled.wait()
-
-      result = self.db.execute(self.query)
-      self.handle_query_result(result)
-
-      time.sleep(self.loop_sleep)
-
-  def handle_query_result(self, query_result):
-      for board_id, value in query_result:
-        self.handle_result(board_id, value)
-
-  @abc.abstractmethod
-  def handle_result(self, board_id, value):
-    pass
-
-
-class msd_Thread(DBQueryThread):
-
-  name = 'msd'
-
-  def handle_result(self, board_id, value):
-    now = int(time.time())
-    data = {'board_id': board_id,
-            'sensor_data': now - value,
-            'sensor_type': self.name}
-
-    ACTION_QUEUE.put(data)
-
-
-class exc_Thread(threading.Thread):
-
-  def __init__(self, boards_map, sensors_map, action_config):
-    super(exc_Thread, self).__init__()
-    self.name = 'exc'
-    self.daemon = True
-    self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
+    self.enabled.set()
     self.action_status = {}
+    self.db_file = db_file
+    self._db = None
     self.boards_map = boards_map
     self.sensors_map = sensors_map
     self.action_config = action_config
+    self.mqtt_config = mqtt_config
+    self.action_queue = Queue.PriorityQueue()
 
-  def action_execute(self, data, actions, action_config):
+    self.start_mqtt()
+
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
+
+  def _on_message_metric(self, client, userdata, msg):
+    sensor_data = utils.load_json(msg.payload)
+
+    if not self._db:
+      self._db = database.connect(self.db_file)
+
+    sensor_data, sensor_config = self._prepare_data(sensor_data)
+
+    self._save_sensors_data(sensor_data)
+    self._put_in_queue(sensor_data, sensor_config)
+
+  def _on_message_action(self, client, userdata, msg):
+    sensor_data = utils.load_json(msg.payload)
+
+    sensor_data, sensor_config = self._prepare_data(sensor_data)
+
+    self._put_in_queue(sensor_data, sensor_config)
+
+  def _save_sensors_data(self, sensor_data):
+    if not sensor_data:
+      return
+
+    try:
+      self._db.execute(
+        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
+        (sensor_data['board_id'], sensor_data['sensor_type'], sensor_data['sensor_data'])
+      )
+      self._db.commit()
+    except (sqlite3.IntegrityError) as e:
+      LOG.error("Got exception '%' in mgw thread", e)
+    except (sqlite3.OperationalError) as e:
+      time.sleep(1 + random.random())
+      try:
+        self._db.commit()
+      except (sqlite3.OperationalError) as e:
+        LOG.error("Got exception '%' in mgw thread", e)
+
+  def _put_in_queue(self, sensor_data, sensor_config):
+    if not sensor_data or not sensor_config:
+      return
+
+    priority = sensor_config['priority']
+
+    self.action_queue.put((priority, sensor_data, sensor_config))
+
+  def _prepare_data(self, sensor_data):
+    sensor_data = self._prepare_sensor_data(sensor_data)
+    sensor_config = self._prepare_action_details(sensor_data)
+
+    return sensor_data, sensor_config
+
+  def _prepare_sensor_data(self, sensor_data):
+    if not utils.validate_sensor_data(sensor_data):
+      LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
+      return None
+
+    board_id = sensor_data['board_id']
+    sensor_data['board_desc'] = self.boards_map.get(board_id)
+
+    return sensor_data
+
+  def _prepare_action_details(self, sensor_data):
+    if not sensor_data:
+      return None
+
+    sensor_type = sensor_data.get('sensor_type')
+    action_details = self.sensors_map.get(sensor_type)
+
+    if not action_details:
+      LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
+      return None
+
+    action_details.setdefault('check_if_armed', {'default': True})
+    action_details['check_if_armed'].setdefault('except', [])
+    action_details.setdefault('action_interval', 0)
+    action_details.setdefault('threshold', 'lambda x: True')
+    action_details.setdefault('fail_count', 0)
+    action_details.setdefault('fail_interval', 600)
+    action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+    action_details.setdefault('priority', 500)
+
+    if not utils.validate_action_details(action_details):
+      LOG.warning("Fail to validate data '%s', ignoring..", action_details)
+      return None
+
+    return action_details
+
+  def _action_execute(self, data, actions, action_config):
     result = 0
 
     for a in actions:
@@ -201,35 +157,27 @@ class exc_Thread(threading.Thread):
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      try:
-        status = action_func(data, conf)
-      except (TimeoutError) as e:
-        status = False
-      finally:
-        if not status:
-          LOG.error("Fail to execute action '%s'", action_name)
-          failback_actions = a.get('failback')
-          if failback_actions:
-            LOG.debug("Failback '%s'", failback_actions)
-            result += self.action_execute(data, failback_actions, action_config)
-        else:
-          result += 1
+      p = Process(target=action_func.get('func'), args=(data, conf))
+      p.start()
+      p.join(action_func.get('timeout'))
+      if p.is_alive():
+        p.terminate()
+        status = 255
+      else:
+        status = p.exitcode
+
+      if status:
+        LOG.error("Fail to execute action '%s', exitcode '%d'", action_name, status)
+        failback_actions = a.get('failback')
+        if failback_actions:
+          LOG.debug("Failback '%s'", failback_actions)
+          result += self._action_execute(data, failback_actions, action_config)
+      else:
+        result += 1
 
     return result
 
-  def action_helper(self, data, action_details, action_config=None):
-
-    if not action_details or not action_details.get('action'):
-      LOG.debug("Missing sensor_map/action for sensor_type '%s'", data['sensor_type'])
-      return
-
-    action_details.setdefault('check_if_armed', {'default': True})
-    action_details['check_if_armed'].setdefault('except', [])
-    action_details.setdefault('action_interval', 0)
-    action_details.setdefault('threshold', 'lambda x: True')
-    action_details.setdefault('fail_count', 0)
-    action_details.setdefault('fail_interval', 600)
-    action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+  def _action_helper(self, data, action_details, action_config=None):
 
     action_details = ActionDetailsAdapter(action_details)
 
@@ -248,7 +196,7 @@ class exc_Thread(threading.Thread):
       LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
       return
 
-    if action_details.should_check_if_armed(data['board_id']) and not STATUS['armed']:
+    if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
       return
 
     if not eval(action_details['threshold'])(data['sensor_data']):
@@ -261,129 +209,30 @@ class exc_Thread(threading.Thread):
     if (now - self.action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
       return
 
-    if self.action_execute(data, action_details['action'], action_config):
+    if self._action_execute(data, action_details['action'], action_config):
       self.action_status[data['board_id']][data['sensor_type']]['last_action'] = now
 
   def run(self):
     LOG.info('Starting')
+    self.loop_start()
+    self.publish_status()
     while True:
       self.enabled.wait()
       try:
-        sensor_data = ACTION_QUEUE.get(True, 10)
+        priority, sensor_data, sensor_config = self.action_queue.get(True, 5)
       except (Queue.Empty) as e:
         continue
 
-      sensor_type = sensor_data['sensor_type']
-      sensor_config = self.sensors_map.get(sensor_type)
+      LOG.debug("Got sensor_data '%s' with priority '%d'", sensor_data, priority)
 
-      board_id = str(sensor_data['board_id'])
-      sensor_data['board_desc'] = self.boards_map.get(board_id)
+      self._action_helper(sensor_data, sensor_config, self.action_config)
 
-      self.action_helper(sensor_data, sensor_config, self.action_config)
-
-
-class mgw_Thread(threading.Thread):
-
-  # [ID][metric:value] / [10][voltage:3.3]
-  _re_sensor_data = re.compile(
-    '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
-
-  def __init__(self, serial, loop_sleep, gateway_ping_time, db_file):
-    super(mgw_Thread, self).__init__()
-    self.name = 'mgw'
-    self.daemon = True
-    self.enabled = threading.Event()
-    if STATUS[self.name]:
-      self.enabled.set()
-    self.serial = serial
-    self.loop_sleep = loop_sleep
-    self.last_gw_ping = 0
-    self.gateway_ping_time = gateway_ping_time
-    self.db_file = db_file
-
-  def ping_gateway(self):
-    try:
-      self.serial.write('1:1')
-      time.sleep(1)
-    except (IOError, ValueError, serial.serialutil.SerialException) as e:
-      LOG.error("Got exception '%' in ping_gateway", e)
-    else:
-      self.last_gw_ping = int(time.time())
-
-  def _read_sensors_data(self):
-    data = {}
-    try:
-      s_data = self.serial.readline().strip()
-      m = self._re_sensor_data.match(s_data)
-      # {"board_id": 0, "sensor_type": "temperature", "sensor_data": 2}
-      data = m.groupdict()
-    except (IOError, ValueError, serial.serialutil.SerialException) as e:
-      LOG.error("Got exception '%' in mgw thread", e)
-      self.serial.close()
-      time.sleep(self.loop_sleep)
-      try:
-        self.serial.open()
-      except (OSError) as e:
-        LOG.warning('Failed to open serial')
-    except (AttributeError) as e:
-      if len(s_data) > 0:
-        LOG.debug('> %s', s_data)
-    finally:
-      if (int(time.time()) - self.last_gw_ping >= self.gateway_ping_time):
-        self.ping_gateway()
-
-    return data
-
-  def _save_sensors_data(self, data):
-    try:
-      self.db.execute(
-        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
-        (data['board_id'], data['sensor_type'], data['sensor_data'])
-      )
-      self.db.commit()
-    except (sqlite3.IntegrityError) as e:
-      LOG.error("Got exception '%' in mgw thread", e)
-    except (sqlite3.OperationalError) as e:
-      time.sleep(1 + random.random())
-      try:
-        self.db.commit()
-      except (sqlite3.OperationalError) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
-
-  def run(self):
-    LOG.info('Starting')
-    self.db = database.connect(self.db_file)
-
-    while True:
-      self.enabled.wait()
-
-      sensor_data = self._read_sensors_data()
-      if not sensor_data:
-        continue
-
-      LOG.debug("Got data from serial '%s'", sensor_data)
-
-      self._save_sensors_data(sensor_data)
-
-      ACTION_QUEUE.put(sensor_data)
-
-
-STATUS = {
-  "armed": 1,
-  "msd": 1,
-  "mgw": 1,
-  "exc": 1,
-  "fence": 1,
-}
-
-ACTION_QUEUE = Queue.Queue()
 
 LOG = logging.getLogger(__name__)
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Moteino gateway')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('Moteino gateway')
   parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
   parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
@@ -406,12 +255,14 @@ def main():
 
   utils.create_logger(conf['logging']['level'])
 
-  mgmt = mgmt_Thread(
-    conf=conf,
+  mgw = MgwThread(
+    db_file=conf['db_file'],
     boards_map=boards_map,
     sensors_map=sensors_map,
-  )
-  mgmt.start()
+    action_config=conf['action_config'],
+    mqtt_config=conf['mqtt'])
+
+  mgw.start()
 
 
 if __name__ == "__main__":

@@ -1,30 +1,17 @@
 #!/usr/bin/env python
-import argparse
 import json
 import os
-import socket
 import time
 
 import bottle
 import bottle.ext.sqlite
 import netaddr
 
+from moteino_sensors import mqtt
 from moteino_sensors import utils
 
 
 app = bottle.Bottle()
-
-
-def write2socket(data, response=False):
-  data = json.dumps(data)
-
-  client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-  client.connect(app.config['appconfig']['mgmt_socket'])
-  client.send(data)
-
-  if response:
-    return client.recv(1024)
-
 
 @app.hook('after_request')
 def after_request():
@@ -53,34 +40,25 @@ def static(filepath):
 
 @app.route('/api/action/status')
 def get_action_status():
-  output = write2socket({"action": "status"}, response=True)
-  return output
+  return app.config['mqtt'].status
 
 
 @app.route('/api/action/status', method=['POST'])
 def set_action_status():
   data = bottle.request.json
   if data:
-    write2socket({
-      "action": "set",
-      "data": data
-    })
+    app.config['mqtt'].publish_status(data)
 
 
 @app.route('/api/action/invert_status', method=['POST'])
 def action_invert_status():
   if (bottle.request.json):
-    status = json.loads(get_action_status())
+    status = get_action_status()
     name = bottle.request.json.get('name')
     cur_status = status.get(name)
     if cur_status is not None:
       inverted = not int(cur_status)
-      write2socket({
-        "action": "set",
-        "data": {
-          name: int(inverted)
-        }
-      })
+      app.config['mqtt'].publish_status({name: int(inverted)})
 
 
 @app.route('/api/node', method=['GET', 'POST'])
@@ -153,9 +131,21 @@ def get_graph(db, graph_type='uptime'):
   return json.dumps(output)
 
 
+class SyncThread(mqtt.MqttThread):
+  def __init__(self, conf):
+    super(SyncThread, self).__init__()
+    self.app_config = conf
+    self.daemon = True
+    self.mqtt_config = conf['mqtt']
+    self.start_mqtt()
+
+  def run(self):
+    while True:
+      self.mqtt.loop()
+
+
 def main():
-  parser = argparse.ArgumentParser(description='Moteino gateway API')
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser = utils.create_arg_parser('Moteino gateway API')
   args = parser.parse_args()
 
   api_config = utils.load_config(args.dir + '/global.config.json')
@@ -166,6 +156,9 @@ def main():
       api_config['static_dir'] = os.path.join(os.path.dirname(__file__), 'static')
 
   app.config['appconfig'] = api_config
+
+  app.config['mqtt'] = SyncThread(app.config['appconfig'])
+  app.config['mqtt'].start()
 
   plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
   app.install(plugin)

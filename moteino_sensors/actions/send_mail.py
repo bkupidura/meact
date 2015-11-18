@@ -1,14 +1,14 @@
 import logging
 import smtplib
 import socket
-import timeout_decorator
+import sys
 
 LOG = logging.getLogger(__name__)
+TIMEOUT=5
 
-@timeout_decorator.timeout(5, use_signals=False)
 def send_mail(data, action_config):
   if not action_config.get('enabled'):
-    return False
+    sys.exit(1)
 
   LOG.info('Sending mail')
 
@@ -21,6 +21,6 @@ def send_mail(data, action_config):
     s.quit()
   except (socket.gaierror, socket.timeout, smtplib.SMTPAuthenticationError, smtplib.SMTPDataError) as e:
     LOG.warning("Got exception '%s' in send_mail", e)
-    return False
+    sys.exit(2)
   else:
-    return True
+    sys.exit(0)

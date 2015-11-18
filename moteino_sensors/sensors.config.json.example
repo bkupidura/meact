@@ -6,7 +6,8 @@
     "threshold": "lambda x: float(x)<3.2",
     "fail_count": 2,
     "fail_interval": 300,
-    "message_template": "Board {board_desc} ({board_id}) reports low voltage {sensor_data}V"
+    "message_template": "Board {board_desc} ({board_id}) reports low voltage {sensor_data}V",
+    "priority": 50,
   },
   "motion": {
     "action": [{"name": "send_sms_at", "failback": [{"name": "send_sms"}]}, {"name": "log"}],
@@ -15,7 +16,8 @@
     "threshold": "lambda x: int(x)==1",
     "fail_count": 0,
     "fail_interval": 0,
-    "message_template": "Motion detected on board {board_desc} ({board_id})"
+    "message_template": "Motion detected on board {board_desc} ({board_id})",
+    "priority": 0
   },
   "uptime": {
     "action": [{"name": "send_mail"}, {"name": "log"}],
@@ -24,7 +26,8 @@
     "threshold": "lambda x: int(x)<25",
     "fail_count": 0,
     "fail_interval": 0,
-    "message_template": "Board {board_desc} ({board_id}) was rebooted"
+    "message_template": "Board {board_desc} ({board_id}) was rebooted",
+    "priority": 50
   },
   "msd": {
     "action": [{"name": "send_mail"}, {"name": "log"}],
@@ -33,6 +36,7 @@
     "threshold": "lambda x: int(x)>0",
     "fail_count": 0,
     "fail_interval": 0,
-    "message_template": "Board {board_desc} ({board_id}) is missing for {sensor_data} seconds"
+    "message_template": "Board {board_desc} ({board_id}) is missing for {sensor_data} seconds",
+    "priority": 20
   }
 }
