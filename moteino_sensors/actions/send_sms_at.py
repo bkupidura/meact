@@ -19,7 +19,7 @@ def send_sms_at(data, action_config):
   modem = GsmModem(action_config['port'], action_config['speed'])
   try:
     modem.connect()
-    modem.waitForNetworkCoverage(2)
+    modem.waitForNetworkCoverage()
   except TimeoutException:
     LOG.warning('Got exception in send_sms_at')
     sys.exit(2)

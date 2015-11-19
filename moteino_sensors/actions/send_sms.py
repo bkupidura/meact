@@ -25,7 +25,7 @@ def send_sms(data, action_config):
   }
 
   try:
-    r = requests.get(url, params=params, timeout=5)
+    r = requests.get(url, params=params)
     r.raise_for_status()
   except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
     LOG.warning("Got exception '%s' in send_sms", e)

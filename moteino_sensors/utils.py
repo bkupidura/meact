@@ -96,7 +96,7 @@ def _load_actions():
         action_module = __import__(prefix + action_name,
                                    globals(), locals(), fromlist=[action_name, ])
         action_func = getattr(action_module, action_name)
-        timeout = getattr(action_module, 'TIMEOUT', None)
+        timeout = getattr(action_module, 'TIMEOUT', 10)
         mapping[action_name] = {'func': action_func, 'timeout': timeout}
         # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
     return mapping

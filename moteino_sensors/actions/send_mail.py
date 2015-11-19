@@ -14,7 +14,7 @@ def send_mail(data, action_config):
 
   message = "From: {sender}\nTo: {recipient}\nSubject: {subject}\n\n{msg}\n\n".format(msg=data['message'], **action_config)
   try:
-    s = smtplib.SMTP(action_config['host'], action_config['port'], timeout=5)
+    s = smtplib.SMTP(action_config['host'], action_config['port'])
     s.starttls()
     s.login(action_config['user'], action_config['password'])
     s.sendmail(action_config['sender'], action_config['recipient'], message)
