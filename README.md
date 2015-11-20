@@ -70,18 +70,23 @@ Fields:
 
 ### Supervisor
 > [program:moteino-gateway]
+
 > command=/usr/local/bin/moteino-gateway --dir /root/mgw/main
 
 > [program:moteino-api]
+
 > command=/usr/local/bin/moteino-api --dir /root/mgw/main/api
 
 > [program:moteino-fence]
+
 > command=/usr/local/bin/moteino-fence --dir /root/mgw/main/fence
 
 > [program:moteino-srl]
+
 > command=/usr/local/bin/moteino-srl --dir /root/mgw/main/fence
 
 > [program:moteino-dbaq]
+
 > command=/usr/local/bin/moteino-dbaq --dir /root/mgw/main/fence
 
 ## Running tests
@@ -239,3 +244,29 @@ Ex.
 Updates to geofence API can be handled on iphone/android by:
 * IFTTT - https://ifttt.com
 * Geofancy - https://github.com/Geofancy
+
+In example dir you can find geofencig API.
+Geofencing API should be running on public available server.
+Because of this please use SSL+strong password/long device id.
+
+IFTTT recipe "If You enter or exit an area, then make a web request".
+* if - "You enter or exit an area"
+* then - "Make a web request"
+* action url - http://example.com/geofence.php
+* action method - POST
+* action content-type - application/x-www-form-urlencoded
+* action body - trigger={{EnteredOrExited}}&device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE
+
+IFTTT web req dosen't support basic-auth, so you should set $ignore_auth_for_devices to 1.
+
+geofence.php curl examples:
+
+Get status:
+> curl example.com/geofence.php -u user:pass
+
+> {"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE":{"action":"entered","time":1448045574}}
+
+Update status:
+> curl example.com/geofence.php --data 'device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&trigger=entered'
+
+> curl example.com/geofence.php --data 'device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&trigger=exited'

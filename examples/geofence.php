@@ -43,8 +43,8 @@ function validate_device($device, $valid_devices){
 
 $user = get_value($_SERVER, 'PHP_AUTH_USER');
 $pass = get_value($_SERVER, 'PHP_AUTH_PW');
-$device = get_value($_POST, 'device-id');
-$action = get_value($_POST, 'action');
+$device = get_value($_POST, 'device');
+$action = get_value($_POST, 'trigger');
 
 $data = get_data($data_file);
 
