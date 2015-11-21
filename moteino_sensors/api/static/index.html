@@ -48,10 +48,15 @@
             $link.parent().removeClass('active');
             $(href).tab('show');
         }
-        function invert_status(what){
+        function invert_status(what, value){
             msg = 'Change '+what+' status?';
+            if (value == 0){
+                value = 1;
+            } else {
+                value = 0;
+            }
             if (confirm(msg)){
-                $.postJSON(api_endpoint+'/action/invert_status', '{"name": "'+what+'"}');
+                $.postJSON(api_endpoint+'/action/status', '{"'+what+'":'+value+'}');
                 setTimeout(refresh_tab(document.getElementById('status-tab')), 500);
             }
             return false;
@@ -213,9 +218,9 @@
         <div class="status-wrapper">
         {{#each this}}
           {{#if this}}
-            <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_status('{{@key}}')">{{@key}}: {{this}}</span></h3>
+            <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_status('{{@key}}', '{{this}}')">{{@key}}: {{this}}</span></h3>
           {{else}}
-            <h3><span style="cursor: pointer;" class="label label-warning" onclick="invert_status('{{@key}}')">{{@key}}: {{this}}</span></h3>
+            <h3><span style="cursor: pointer;" class="label label-warning" onclick="invert_status('{{@key}}', '{{this}}')">{{@key}}: {{this}}</span></h3>
           {{/if}}
         {{/each}}
         </div>

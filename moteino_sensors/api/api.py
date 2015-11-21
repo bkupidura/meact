@@ -50,15 +50,14 @@ def set_action_status():
     app.config['mqtt'].publish_status(data)
 
 
-@app.route('/api/action/invert_status', method=['POST'])
-def action_invert_status():
+@app.route('/api/action/mqtt', method=['POST'])
+def set_action_mqtt():
   if (bottle.request.json):
-    status = get_action_status()
-    name = bottle.request.json.get('name')
-    cur_status = status.get(name)
-    if cur_status is not None:
-      inverted = not int(cur_status)
-      app.config['mqtt'].publish_status({name: int(inverted)})
+    topic = bottle.request.json.get('topic')
+    data = bottle.request.json.get('data')
+    retain = bottle.request.json.get('retain', False)
+    if topic and data:
+      app.config['mqtt'].publish(topic, data, retain)
 
 
 @app.route('/api/node', method=['GET', 'POST'])
