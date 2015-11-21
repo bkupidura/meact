@@ -12,7 +12,7 @@ from moteino_sensors import utils
 class SrlThread(mqtt.MqttThread):
   # [ID][metric:value] / [10][voltage:3.3]
   _re_sensor_data = re.compile(
-    '\[(?P<board_id>\d+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
+    '\[(?P<board_id>.+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
   def __init__(self, serial, mqtt_config):
     super(SrlThread, self).__init__()
