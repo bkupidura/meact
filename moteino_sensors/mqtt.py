@@ -97,6 +97,9 @@ class MqttThread(threading.Thread):
   def publish(self, topic, payload, retain=False):
     payload = json.dumps(payload)
     if self.mqtt._host:
-      self.mqtt.publish(topic, payload=payload, retain=retain)
+      if topic and payload:
+        self.mqtt.publish(topic, payload=payload, retain=retain)
+      else:
+        LOG.warning('Topic or payload is empty')
     else:
       LOG.warning('Client is not connected to broker')
