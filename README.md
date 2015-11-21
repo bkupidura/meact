@@ -178,6 +178,8 @@ SRL expect on serial input in format:
 
 [10][voltage:3.3]
 
+[board-10][voltage:3.3]
+
 Moteino code compatible with MGW can be found at https://github.com/bkupidura/moteino
 
 All metrics gathered by SRL will be send over MQTT to topic conf['mgw']+'/metric'
@@ -270,3 +272,16 @@ Update status:
 > curl example.com/geofence.php --data 'device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&trigger=entered'
 
 > curl example.com/geofence.php --data 'device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&trigger=exited'
+
+## Moteino-API
+API delivers static dashboard and way to communicate over MQTT.
+
+API endpoints:
+* GET /api/action/status - get current MQTT status
+* POST /api/action/status - set status and publish it to MQTT
+* POST /api/action/mqtt - send message to MQTT
+* GET/POST /api/action/node/<node_id> - get latests metrics (from DB) for given/all nodes
+* GET/POST /api/action/graph/<graph_type> - get metrics of given type (used by graphs)
+
+Send data to MQTT via API:
+> curl localhost:8080/api/action/mqtt -H "Content-Type: application/json" --data '{"data":{"asd": 10, "bsd": 20}, "topic":"xyz"}'
