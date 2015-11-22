@@ -26,13 +26,11 @@ class SrlThread(mqtt.MqttThread):
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/write', self._on_message_write)
 
   def _on_message_write(self, client, userdata, msg):
-    data = utils.load_json(msg.payload)
-    LOG.debug("Got data for node '%s'", data)
-
+    data = str(msg.payload)
+    LOG.debug("Got data for serial '%s'", data)
     try:
-      r_cmd = "{nodeid}:{cmd}".format(**data)
-      self.serial.write(r_cmd)
-    except (IOError, ValueError, serial.serialutil.SerialException) as e:
+      self.serial.write(data)
+    except (IOError, ValueError, TypeError, serial.serialutil.SerialException) as e:
       LOG.error("Got exception '%s' in srl thread", e)
 
   def _read_sensors_data(self):

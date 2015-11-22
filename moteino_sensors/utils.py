@@ -34,7 +34,8 @@ class ActionValidator(Validator):
 
 
 def validate_sensor_data(data):
-  schema = {'board_id': {'required': True, 'empty': False, 'type': 'string'},
+  schema = {'board_id': {'required': True, 'empty': False,
+                'type': 'string', 'regex': '^[a-zA-Z0-9]+$'},
             'sensor_type': {'required': True, 'empty': False, 'type': 'string'},
             'sensor_data': {'required': True, 'empty': False, 'type': 'string'}}
   v = Validator()

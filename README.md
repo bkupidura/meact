@@ -188,19 +188,11 @@ Moteino code compatible with MGW can be found at https://github.com/bkupidura/mo
 All metrics gathered by SRL will be send over MQTT to topic conf['mgw']+'/metric'
 
 SRL will handle all data send to topic conf['srl']+'/write'.
-This data will be send to serial in format:
-
-[BOARD_ID]:[COMMAND_ID]
-
-1:1 - ask for report from board with id 1 (gateway)
-
-SRL input over MQTT in format:
-
-{"nodeid": "BOARD_ID", "cmd": "COMMAND_ID"}
+Data from MQTT will be send to serial without any processing.
 
 This can be used to ping gateway:
 
-> mosquitto_pub -t 'srl/write' -m '{"nodeid": "1", "cmd": "1"}'
+> mosquitto_pub -t 'srl/write' -m '1:1'
 
 ## Moteino-gateway
 Gateway handle MQTT traffic on topics:
