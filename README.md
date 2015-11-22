@@ -22,6 +22,9 @@ MGW contains a few sub services:
 * handlebars (templates)
 * twitter bootstrap
 
+## Architecture
+![MGW Arch](https://rawgit.com/bkupidura/mgw/master/docs/img/MGW_MQTT.svg)
+
 ## Instalation:
 
 ```
