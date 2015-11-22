@@ -62,7 +62,7 @@ def set_action_mqtt():
 
 @app.route('/api/node', method=['GET', 'POST'])
 @app.route('/api/node/', method=['GET', 'POST'])
-@app.route('/api/node/<node_id:int>', method=['GET', 'POST'])
+@app.route('/api/node/<node_id>', method=['GET', 'POST'])
 def get_nodes(db, node_id=False):
   now = int(time.time())
   start = now - 60 * 60 * 1
