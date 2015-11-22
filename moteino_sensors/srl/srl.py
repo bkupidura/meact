@@ -79,7 +79,8 @@ def main():
 
   conf = utils.load_config(args.dir + '/global.config.json')
 
-  utils.create_logger(logging.INFO)
+  logging_conf = conf.get('logging', {})
+  utils.create_logger(logging_conf)
 
   ser = serial.Serial(
     conf['serial']['device'],

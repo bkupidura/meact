@@ -253,7 +253,8 @@ def main():
     print('Syned boards in {}'.format(conf['db_file']))
     sys.exit(0)
 
-  utils.create_logger(conf['logging']['level'])
+  logging_conf = conf.get('logging', {})
+  utils.create_logger(logging_conf)
 
   mgw = MgwThread(
     db_file=conf['db_file'],

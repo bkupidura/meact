@@ -39,6 +39,7 @@ class DBQueryThread(mqtt.MqttThread):
 
   def _handle_query_result(self, query_result):
       for board_id, value in query_result:
+        LOG.debug("Got query result (%s) for board '%s' value '%s'", self.name, board_id, value)
         self._handle_result(board_id, value)
 
   @abc.abstractmethod
@@ -66,7 +67,8 @@ def main():
 
   conf = utils.load_config(args.dir + '/global.config.json')
 
-  utils.create_logger(logging.INFO)
+  logging_conf = conf.get('logging', {})
+  utils.create_logger(logging_conf)
 
   msd = MsdThread(conf=conf)
   msd.start()

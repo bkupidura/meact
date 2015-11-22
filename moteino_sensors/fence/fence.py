@@ -70,6 +70,8 @@ def api_request(url, method='GET', params=None, data=None, auth=None, headers=No
     data = json.loads(req.text)
   except (ValueError) as e:
     return {}
+
+  LOG.debug("Got response from geofencing API '%s'", data)
   return data
 
 
@@ -82,7 +84,9 @@ def main():
 
   conf = utils.load_config(args.dir + '/global.config.json')
 
-  utils.create_logger(logging.INFO)
+  logging_conf = conf.get('logging', {})
+  utils.create_logger(logging_conf)
+
   logging.getLogger("requests").setLevel(logging.CRITICAL)
   requests.packages.urllib3.disable_warnings()
 

@@ -62,7 +62,10 @@ def validate_action_details(data):
   return v.validate(data, schema)
 
 
-def create_logger(level, log_file=None):
+def create_logger(conf):
+  level = conf.get('level', logging.INFO)
+  log_file = conf.get('file')
+
   logger = logging.getLogger()
   logger.setLevel(level)
   formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
