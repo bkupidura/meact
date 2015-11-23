@@ -271,6 +271,10 @@ Update status:
 ## Moteino-API
 API delivers static dashboard and way to communicate over MQTT.
 
+Graph configuration is available inside api/static/graphs.js.
+
+Node commands configuration is available inside api/static/commands.js.
+
 API endpoints:
 * GET /api/action/status - get current MQTT status
 * POST /api/action/status - set status and publish it to MQTT
