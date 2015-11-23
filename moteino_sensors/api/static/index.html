@@ -210,7 +210,7 @@
     </script>
     <script id="commandTemplate" type="x-handlebars-template">
       {{#each this}}
-        <button type="button" class="btn btn-xs" onclick="send_command('{{name}}', '{{command}}', '{{board}}', '{{mqtt_topic}}')">{{name}}</button>&nbsp;
+        <span style="cursor: pointer;" class="label label-default" onclick="send_command('{{name}}', '{{command}}', '{{board}}', '{{mqtt_topic}}')">{{name}}</span>&nbsp;
       {{/each}}
     </script>
 </html>
