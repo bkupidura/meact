@@ -17,3 +17,24 @@ function render_command(board){
     }
     return cmd;
 }
+
+function toggle_command(board){
+    var div = document.getElementById('command-'+board);
+    var data = render_command(board);
+
+    var source = $('#commandTemplate').html();
+    var template = Handlebars.compile(source);
+    var rendered = template(data);
+
+    $(div).html(rendered);
+
+}
+
+function send_command(name, command, board, mqtt_topic){
+    msg = 'Send '+name+' to board '+board+'?';
+    if (confirm(msg)){
+        mqtt_msg = {'topic': mqtt_topic, 'data': command};
+        $.postJSON(api_endpoint+'/action/mqtt', JSON.stringify(mqtt_msg));
+    }
+    return false;
+}

@@ -22,3 +22,26 @@ for (var key in graphs){
 
     menu.appendChild(li);
 }
+Highcharts.setOptions({
+    global: {
+        useUTC: false,
+    }
+});
+
+function afterSetExtremes(e) {
+    var chart = $('#graph').highcharts();
+    var json_range = '{"start":'+e.min/1000+',"end":'+e.max/1000+', "last_available": 10}';
+    var what = chart.options.credits.text;
+    chart.showLoading('Loading data from server...');
+    $.postJSON(api_endpoint+'/graph/'+what, json_range, function (data) {
+        $.each(data, function(id_j, value){
+            var name = data[id_j]['name']
+            $.each(chart.series, function(id_s, value){
+                if (chart.series[id_s]['name'] == name){
+                    chart.series[id_s].setData(data[id_j]['data']);
+                }
+            });
+        });
+        chart.hideLoading();
+    });
+}

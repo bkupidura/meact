@@ -50,25 +50,6 @@
             $link.parent().removeClass('active');
             $(href).tab('show');
         }
-        function toggle_action(board){
-            var div = document.getElementById('action-'+board);
-            var data = render_command(board);
-
-            var source = $('#actionTemplate').html();
-            var template = Handlebars.compile(source);
-            var rendered = template(data);
-
-            $(div).html(rendered);
-
-        }
-        function send_command(name, command, board, mqtt_topic){
-            msg = 'Send '+name+' to board '+board+'?';
-            if (confirm(msg)){
-                mqtt_msg = {'topic': mqtt_topic, 'data': command};
-                $.postJSON(api_endpoint+'/action/mqtt', JSON.stringify(mqtt_msg));
-            }
-            return false;
-        }
         function invert_status(what, value){
             msg = 'Change '+what+' status?';
             if (value == 0){
@@ -81,23 +62,6 @@
                 setTimeout(refresh_tab(document.getElementById('status-tab')), 500);
             }
             return false;
-        }
-        function afterSetExtremes(e) {
-            var chart = $('#graph').highcharts();
-            var json_range = '{"start":'+e.min/1000+',"end":'+e.max/1000+', "last_available": 10}';
-            var what = chart.options.credits.text;
-            chart.showLoading('Loading data from server...');
-            $.postJSON(api_endpoint+'/graph/'+what, json_range, function (data) {
-                $.each(data, function(id_j, value){
-                    var name = data[id_j]['name']
-                    $.each(chart.series, function(id_s, value){
-                        if (chart.series[id_s]['name'] == name){
-                            chart.series[id_s].setData(data[id_j]['data']);
-                        }
-                    });
-                });
-                chart.hideLoading();
-            }); 
         }
         jQuery["postJSON"] = function(url, data, callback) {
             if (jQuery.isFunction(data)) {
@@ -114,11 +78,6 @@
                 success: callback
             });
         };
-        Highcharts.setOptions({
-            global: {
-                useUTC: false,
-            }
-        });
     </script>
     <script>
         $('.nav-tabs a').click(function(){
@@ -228,8 +187,8 @@
     <script id="nodeTemplate" type="x-handlebars-template">
         {{#each this}}
           {{#if data}}
-            <h3><span style="cursor: pointer;" class="label label-default" data-toggle="collapse" data-target="#action-{{name}}" onclick="toggle_action('{{name}}')">{{desc}} ({{name}})</span></h3>
-            <div id="action-{{name}}"></div>
+            <h3><span style="cursor: pointer;" class="label label-default" data-toggle="collapse" data-target="#command-{{name}}" onclick="toggle_command('{{name}}')">{{desc}} ({{name}})</span></h3>
+            <div id="command-{{name}}"></div>
             {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
           {{else}}
             <h3><span class="label label-danger">{{desc}} ({{name}})</span></h3>
@@ -247,7 +206,7 @@
         {{/each}}
         </div>
     </script>
-    <script id="actionTemplate" type="x-handlebars-template">
+    <script id="commandTemplate" type="x-handlebars-template">
       {{#each this}}
         <button type="button" class="btn btn-xs" onclick="send_command('{{name}}', '{{command}}', '{{board}}', '{{mqtt_topic}}')">{{name}}</button>&nbsp;
       {{/each}}
