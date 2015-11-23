@@ -5,11 +5,11 @@ commands = {
 
 function render_command(board){
     if (board in commands) {
-        commands_for_board = $.extend(true, [], commands[board]);
+        var commands_for_board = $.extend(true, [], commands[board]);
     } else {
-        commands_for_board = $.extend(true, [], commands['default']);
+        var commands_for_board = $.extend(true, [], commands['default']);
     }
-    cmd = [];
+    var cmd = [];
     for (i=0; i<commands_for_board.length; i++){
         commands_for_board[i]['board'] = board;
         commands_for_board[i]['command'] = sprintf(commands_for_board[i]['command'], commands_for_board[i]);
@@ -31,7 +31,7 @@ function toggle_command(board){
 }
 
 function send_command(name, command, board, mqtt_topic){
-    msg = 'Send '+name+' to board '+board+'?';
+    var msg = 'Send '+name+' to board '+board+'?';
     if (confirm(msg)){
         mqtt_msg = {'topic': mqtt_topic, 'data': command};
         $.postJSON(api_endpoint+'/action/mqtt', JSON.stringify(mqtt_msg));
