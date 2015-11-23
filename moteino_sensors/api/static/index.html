@@ -4,6 +4,8 @@
         <script src="handlebars.js"></script>
         <script src="highstock.js"></script>
         <script src="exporting.js"></script>
+        <script src="sprintf.js"></script>
+        <script src="commands.js"></script>
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="dist/css/bootstrap.min.css">
 
@@ -47,6 +49,25 @@
             var $link = $('li.active a[data-toggle="tab"]');
             $link.parent().removeClass('active');
             $(href).tab('show');
+        }
+        function toggle_action(board){
+            var div = document.getElementById('action-'+board);
+            var data = render_command(board);
+
+            var source = $('#actionTemplate').html();
+            var template = Handlebars.compile(source);
+            var rendered = template(data);
+
+            $(div).html(rendered);
+
+        }
+        function send_command(name, command, board, mqtt_topic){
+            msg = 'Send '+name+' to board '+board+'?';
+            if (confirm(msg)){
+                mqtt_msg = {'topic': mqtt_topic, 'data': command};
+                $.postJSON(api_endpoint+'/action/mqtt', JSON.stringify(mqtt_msg));
+            }
+            return false;
         }
         function invert_status(what, value){
             msg = 'Change '+what+' status?';
@@ -207,7 +228,8 @@
     <script id="nodeTemplate" type="x-handlebars-template">
         {{#each this}}
           {{#if data}}
-            <h3><span class="label label-default">{{desc}} ({{name}})</span></h3>
+            <h3><span style="cursor: pointer;" class="label label-default" data-toggle="collapse" data-target="#action-{{name}}" onclick="toggle_action('{{name}}')">{{desc}} ({{name}})</span></h3>
+            <div id="action-{{name}}"></div>
             {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
           {{else}}
             <h3><span class="label label-danger">{{desc}} ({{name}})</span></h3>
@@ -224,5 +246,10 @@
           {{/if}}
         {{/each}}
         </div>
+    </script>
+    <script id="actionTemplate" type="x-handlebars-template">
+      {{#each this}}
+        <button type="button" class="btn btn-xs" onclick="send_command('{{name}}', '{{command}}', '{{board}}', '{{mqtt_topic}}')">{{name}}</button>&nbsp;
+      {{/each}}
     </script>
 </html>
