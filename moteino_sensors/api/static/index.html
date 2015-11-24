@@ -6,6 +6,7 @@
         <script src="exporting.js"></script>
         <script src="sprintf.js"></script>
         <script src="commands.js"></script>
+        <script src="utils.js"></script>
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="dist/css/bootstrap.min.css">
 
@@ -17,6 +18,7 @@
 
         <!-- Latest compiled and minified JavaScript -->
         <script src="dist/js/bootstrap.min.js"></script>
+        <script src="bootbox.min.js"></script>
     </head>
     <body>
         <nav class="navbar navbar-inverse navbar-fixed-top">
@@ -45,172 +47,125 @@
     <script>
         api_endpoint = parent.location.protocol+'//'+window.location.hostname+':'+window.location.port+'/api';
 
-        function refresh_tab(href){
-            var $link = $('li.active a[data-toggle="tab"]');
-            $link.parent().removeClass('active');
-            $(href).tab('show');
-        }
-        function invert_status(what, value){
-            var msg = 'Change '+what+' status?';
-            if (value == 0){
-                value = 1;
-            } else {
-                value = 0;
-            }
-            if (confirm(msg)){
-                var data = {};
-                data[what] = value;
-                $.postJSON(api_endpoint+'/action/status', JSON.stringify(data));
-                setTimeout(refresh_tab(document.getElementById('status-tab')), 500);
-            }
-            return false;
-        }
-        jQuery["postJSON"] = function(url, data, callback) {
-            if (jQuery.isFunction(data)) {
-                callback = data;
-                data = undefined;
-            }
-
-            return jQuery.ajax({
-                url: url,
-                type: "POST",
-                contentType:"application/json; charset=utf-8",
-                dataType: "json",
-                data: data,
-                success: callback
-            });
-        };
-    </script>
-    <script>
         $('.nav-tabs a').click(function(){
             $(this).tab('show');
         })
-    </script>
-    <script>
         $(document).on('ready', function() {
             $('.nav-tabs a').on('show.bs.tab', function(ev){
-                what = $(ev.target).text().toLowerCase();
                 var href = $(ev.target).attr("href");
 
                 if ("refreshTimer" in window){
                     clearInterval(refreshTimer);
                 }
-                refreshTimer = setInterval(refresh_tab, 1000*60, this);
+                refreshTimer = setInterval(refreshTab, 1000*60, this);
 
-                if (what == 'status' || what == 'node'){
-                    if (what == 'status') url = api_endpoint+'/action/status';
-                    if (what == 'node') url = api_endpoint+'/node';
-                    $.getJSON(url).done(function(data){
-                        var source = $('#' + what + 'Template').html();
-                        var template = Handlebars.compile(source);
-                        var rendered = template(data);
-                        $(href).html(rendered);
+                if (href == '#status'){
+                    $.getJSON(api_endpoint + '/action/status').done(function(data){
+                        status_group = {
+                            'Service': ['msd', 'mgw', 'srl', 'fence'],
+                            'Status': ['armed']
+                        }
+                        var status_html = ''
+                        for (var k in status_group){
+                            var source = $(href + k + 'Template').html();
+                            var template = Handlebars.compile(source);
+                            var group_data = filterObject(data, status_group[k]);
+
+                            status_html += template(group_data);
+                        }
+
+                        $(href).html(status_html);
                     });
-                } else if (what in graphs){
-                    $.postJSON(api_endpoint+'/graph/'+what, '{"last_available": 10}', function(data, status){
-                        var chart_begin = new Date(new Date().setYear(new Date().getFullYear() - 2)).getTime();
-                        $('#graph').highcharts('StockChart', {
-                            chart: {
-                                type: graphs[what]['chart_type'],
-                            },
-                            title: {
-                                text: graphs[what]['graph_title'],
-                            },
-                            xAxis: {
-                                type: 'datetime',
-                                events : {
-                                    afterSetExtremes : afterSetExtremes
-                                },
-                            },
-                            rangeSelector: {
-                                buttons: [{
-                                    type: 'hour',
-                                    count: 1,
-                                    text: '1h'
-                                }, {
-                                    type: 'day',
-                                    count: 1,
-                                    text: '1d'
-                                }, {
-                                    type: 'day',
-                                    count: 7,
-                                    text: '1w'
-                                }, {
-                                    type: 'month',
-                                    count: 1,
-                                    text: '1m'
-                                }, {
-                                    type: 'year',
-                                    count: 1,
-                                    text: '1y'
-                                }],
-                                inputEnabled: true, // it supports only days
-                                allButtonsEnabled: true,
-                                enabled: true,
-                                selected: 0,
-                            },
-                            navigator : {
-                                enabled: true,
-                                adaptToUpdatedData: false,
-                                series : {
-                                    data : [[chart_begin, 0]],
-                                },
-                            },
-                            scrollbar: {
-                                enabled: false,
-                            },
-                            tooltip: {
-                                formatter: function() {
-                                    var s = Highcharts.dateFormat('%A, %d-%m-%Y %H:%M:%S',new Date(this.x));
-                                    var round = graphs[what]['value_round'];
-                                    s += '<br/>' + this.series.name + ': <b>' + this.y.toFixed(round) + '</b>';
-                                    return s;
-                                },
-                                shared: false,
-                            },
-                            yAxis: {
-                                title: {
-                                    text: graphs[what]['y_axis_title'],
-                                },
-                            },
-                            legend: {
-                                enabled: true,
-                            },
-                            credits: {
-                                text: what,
-                            },
-                            series: data
-                        });
+                } else if (href == '#node'){
+                    $.getJSON(api_endpoint + '/node').done(function(data){
+                        var nodes = {'Online': [], 'Offline': []}
+
+                        var node_html = '';
+
+                        for (var k in data){
+                            if (data[k]['data'].length){
+                                nodes['Online'].push(data[k]);
+                            } else {
+                                nodes['Offline'].push(data[k]);
+                            }
+                        }
+                        for (var k in nodes){
+                            var source = $(href + k + 'Template').html();
+                            var template = Handlebars.compile(source);
+
+                            node_html += template(nodes[k]);
+                        }
+
+                        $(href).html(node_html);
                     });
+                } else if (href == '#graph'){
+                    var graph_type = $(ev.target).text().toLowerCase();
+                    function callback(data){
+                        handleGraphRequest(graph_type, data);
+                    }
+
+                    $.postJSON(api_endpoint + '/graph/' + graph_type, '{"last_available": 10}', callback);
                 }
             });
         });
     </script>
-    <script id="nodeTemplate" type="x-handlebars-template">
+    <script id="nodeOnlineTemplate" type="x-handlebars-template">
+        <h3>Online nodes</h3>
         {{#each this}}
-          {{#if data}}
-            <h3><span style="cursor: pointer;" class="label label-default" data-toggle="collapse" data-target="#command-{{name}}" onclick="toggle_command('{{name}}')">{{desc}} ({{name}})</span></h3>
-            <div id="command-{{name}}"></div>
-            {{#data}}<span class="label label-info">{{0}}: {{1}}</span>&nbsp;{{/data}}
-          {{else}}
-            <h3><span class="label label-danger">{{desc}} ({{name}})</span></h3>
-          {{/if}}
+            <h4>
+                <span style="cursor: pointer;" class="label label-default" onclick="showCommandDialog('{{name}}')">{{desc}} ({{name}})</span>
+            </h4>
+            <h5>
+                {{#data}}
+                    <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
+                {{/data}}
+            </h5>
         {{/each}}
     </script>
-    <script id="statusTemplate" type="x-handlebars-template">
+    <script id="nodeOfflineTemplate" type="x-handlebars-template">
+        <h3>Offline nodes</h3>
+        <h4>
+            {{#each this}}
+                <span class="label label-danger">{{desc}} ({{name}})</span>
+            {{/each}}
+        </h4>
+    </script>
+    <script id="statusServiceTemplate" type="x-handlebars-template">
+        <h3>Service status</h3>
         <div class="status-wrapper">
-        {{#each this}}
-          {{#if this}}
-            <h3><span style="cursor: pointer;" class="label label-default" onclick="invert_status('{{@key}}', '{{this}}')">{{@key}}: {{this}}</span></h3>
-          {{else}}
-            <h3><span style="cursor: pointer;" class="label label-warning" onclick="invert_status('{{@key}}', '{{this}}')">{{@key}}: {{this}}</span></h3>
-          {{/if}}
-        {{/each}}
+            <div class="row">
+                <h4>
+                {{#each this}}
+                    <div class="col-sm-8 margin">{{@key}}</div>
+                    <div class="col-sm-4 margin">
+                    {{#if this}}
+                        <span style="cursor: pointer;" class="label label-success" onclick="invertStatus('{{@key}}', '{{this}}')">Enabled</span>
+                    {{else}}
+                        <span style="cursor: pointer;" class="label label-danger" onclick="invertStatus('{{@key}}', '{{this}}')">Disabled</span>
+                    {{/if}}
+                    </div>
+               {{/each}}
+                </h4>
+            </div>
         </div>
     </script>
-    <script id="commandTemplate" type="x-handlebars-template">
-      {{#each this}}
-        <span style="cursor: pointer;" class="label label-default" onclick="send_command('{{name}}', '{{command}}', '{{board}}', '{{mqtt_topic}}')">{{name}}</span>&nbsp;
-      {{/each}}
+    <script id="statusStatusTemplate" type="x-handlebars-template">
+        <h3>Status</h3>
+        <div class="status-wrapper">
+            <div class="row">
+                <h4>
+                {{#each this}}
+                    <div class="col-sm-8 margin">{{@key}}</div>
+                    <div class="col-sm-4 margin">
+                    {{#if this}}
+                        <span style="cursor: pointer;" class="label label-success" onclick="invertStatus('{{@key}}', '{{this}}')">True</span>
+                    {{else}}
+                        <span style="cursor: pointer;" class="label label-danger" onclick="invertStatus('{{@key}}', '{{this}}')">False</span>
+                    {{/if}}
+                    </div>
+               {{/each}}
+                </h4>
+            </div>
+        </div>
     </script>
 </html>

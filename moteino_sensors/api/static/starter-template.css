@@ -17,9 +17,10 @@ body {
 } /* bootstrap hack end */
 
 .status-wrapper{
-  width: 10%;
+  width: 20%;
+  display: block;
 }
-
-.status-wrapper .label {
-  display:block;
+.margin {
+  margin-top: 5px;
+  margin-bottom: 5px;
 }

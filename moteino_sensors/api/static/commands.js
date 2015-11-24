@@ -1,40 +1,54 @@
-commands = {
+commands_mapping = {
     '1': [{'name': 'measure', 'command': '%(board)s:1', 'mqtt_topic': 'srl/write'}, {'name': 'reboot', 'command': '%(board)s:255', 'mqtt_topic': 'srl/write'}],
     'default': [{'name': 'reboot', 'command': '%(board)s:255', 'mqtt_topic': 'srl/write'}]
 }
 
-function render_command(board){
-    if (board in commands) {
-        var commands_for_board = $.extend(true, [], commands[board]);
-    } else {
-        var commands_for_board = $.extend(true, [], commands['default']);
-    }
+function getCommands(board){
     var cmd = [];
-    for (i=0; i<commands_for_board.length; i++){
-        commands_for_board[i]['board'] = board;
-        commands_for_board[i]['command'] = sprintf(commands_for_board[i]['command'], commands_for_board[i]);
-        cmd.push(commands_for_board[i]);
+
+    if (board in commands_mapping) {
+        var commands_for_board = $.extend(true, [], commands_mapping[board]);
+    } else {
+        var commands_for_board = $.extend(true, [], commands_mapping['default']);
     }
+
+    commands_for_board.forEach(function(command) {
+        command['board'] = board;
+        command['command'] = sprintf(command['command'], command);
+        cmd.push(command);
+    });
+
     return cmd;
 }
 
-function toggle_command(board){
-    var div = document.getElementById('command-'+board);
-    var data = render_command(board);
+function showCommandDialog(board){
+    var buttons = {}
 
-    var source = $('#commandTemplate').html();
-    var template = Handlebars.compile(source);
-    var rendered = template(data);
+    var commands_available = getCommands(board);
 
-    $(div).html(rendered);
+    commands_available.forEach(function(command) {
+        buttons[command['name']] = {
+            'className': 'btn-warning',
+            'callback': function() {
+                sendCommand(command['name'], command['command'], board, command['mqtt_topic']);
+            }
+        }
+    });
 
+    bootbox.dialog({
+        message: "Which command you want to execute on board " + board + "?",
+        title: "Send remote command",
+        buttons: buttons
+    });
 }
 
-function send_command(name, command, board, mqtt_topic){
-    var msg = 'Send '+name+' to board '+board+'?';
-    if (confirm(msg)){
-        mqtt_msg = {'topic': mqtt_topic, 'data': command};
-        $.postJSON(api_endpoint+'/action/mqtt', JSON.stringify(mqtt_msg));
-    }
+function sendCommand(name, command, board, mqtt_topic){
+    var msg = 'Send ' + name + ' to board ' + board + '?';
+    bootbox.confirm(msg, function(result){
+        if (result){
+            mqtt_msg = {'topic': mqtt_topic, 'data': command};
+            $.postJSON(api_endpoint + '/action/mqtt', JSON.stringify(mqtt_msg));
+        }
+    });
     return false;
 }
