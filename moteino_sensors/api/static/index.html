@@ -5,8 +5,8 @@
         <script src="highstock.js"></script>
         <script src="exporting.js"></script>
         <script src="sprintf.js"></script>
-        <script src="commands.js"></script>
         <script src="utils.js"></script>
+        <script src="mappings.js"></script>
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="dist/css/bootstrap.min.css">
 
@@ -43,7 +43,30 @@
             </div>
         </div>
     </body>
-    <script src="graphs.js"></script>
+    <script>
+        var menu = document.getElementById('dropdown-menu');
+        for (var key in graphs_mapping){
+            var li = document.createElement("li");
+
+            var href = document.createElement("a");
+            href.setAttribute('href', '#graph');
+            href.setAttribute('tabindex', '-1');
+            href.setAttribute('data-toggle', 'tab')
+
+            var txt = document.createTextNode(key);
+
+            href.appendChild(txt);
+            li.appendChild(href);
+
+            menu.appendChild(li);
+        }
+
+        Highcharts.setOptions({
+            global: {
+                useUTC: false,
+            }
+        });
+    </script>
     <script>
         api_endpoint = parent.location.protocol+'//'+window.location.hostname+':'+window.location.port+'/api';
 
@@ -61,15 +84,11 @@
 
                 if (href == '#status'){
                     $.getJSON(api_endpoint + '/action/status').done(function(data){
-                        status_group = {
-                            'Service': ['msd', 'mgw', 'srl', 'fence'],
-                            'Status': ['armed']
-                        }
                         var status_html = ''
-                        for (var k in status_group){
+                        for (var k in status_mapping){
                             var source = $(href + k + 'Template').html();
                             var template = Handlebars.compile(source);
-                            var group_data = filterObject(data, status_group[k]);
+                            var group_data = filterObject(data, status_mapping[k]);
 
                             status_html += template(group_data);
                         }
