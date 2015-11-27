@@ -150,7 +150,7 @@ def main():
   app.config['mqtt'] = SyncThread(app.config['appconfig'])
   app.config['mqtt'].start()
 
-  app.config['db'] = database.connect(app.config['appconfig']['db'])
+  app.config['db'] = database.connect(app.config['appconfig']['db_string'])
 
   app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'])
 

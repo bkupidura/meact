@@ -18,7 +18,7 @@ class DBQueryThread(mqtt.MqttThread):
     self.enabled = threading.Event()
     self.enabled.set()
     self.loop_sleep = conf[self.name]['loop_sleep']
-    self.db_file = conf['db_file']
+    self.db_string = conf['db_string']
     self.query = conf[self.name]['query']
     self.mqtt_config = conf['mqtt']
 
@@ -27,7 +27,7 @@ class DBQueryThread(mqtt.MqttThread):
   def run(self):
     LOG.info('Starting')
     self.loop_start()
-    self.db = database.connect(self.db_file)
+    self.db = database.connect(self.db_string)
     
     while True:
       self.enabled.wait()

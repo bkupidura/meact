@@ -85,8 +85,8 @@ event.listen(
   TRIGGER_SQLITE_UPDATE.execute_if(dialect='sqlite')
 )
 
-def connect(db_file):
-  return create_engine('sqlite:///{}'.format(db_file))
+def connect(connect_string):
+  return create_engine(connect_string)
 
 
 def create_session(db):
@@ -125,11 +125,17 @@ def insert_metric(db, sensor_data):
   s.commit()
 
 
+def prepare_board_ids(board_ids=None):
+  if board_ids is not None and not isinstance(board_ids, list):
+    return [board_ids]
+
+  return board_ids
+
+
 def get_boards(db, board_ids=None):
   s = create_session(db)
 
-  if board_ids is not None and not isinstance(board_ids, list):
-    board_ids = [board_ids]
+  board_ids = prepare_board_ids(board_ids)
 
   boards = s.query(Board)
 
@@ -139,48 +145,36 @@ def get_boards(db, board_ids=None):
   return boards.all()
 
 
-def get_last_metrics(db, board_ids=None, sensor_type=None, start=None, end=None):
+def prepare_metrics(db, table, board_ids=None, sensor_type=None, start=None, end=None):
+  board_ids = prepare_board_ids(board_ids)
+
   s = create_session(db)
 
-  if board_ids is not None and not isinstance(board_ids, list):
-    board_ids = [board_ids]
-
-  last_metrics = s.query(LastMetric)
+  query = s.query(table)
 
   if board_ids:
-    last_metrics = last_metrics.filter(LastMetric.board_id.in_(board_ids))
+    query = query.filter(table.board_id.in_(board_ids))
 
   if sensor_type:
-    last_metrics = last_metrics.filter(LastMetric.sensor_type == sensor_type)
+    query = query.filter(table.sensor_type == sensor_type)
 
   if start:
-    last_metrics = last_metrics.filter(LastMetric.last_update >= start)
+    query = query.filter(table.last_update >= start)
 
   if end:
-    last_metrics = last_metrics.filter(LastMetric.last_update <= end)
+    query = query.filter(table.last_update <= end)
+
+  return query
+
+
+def get_last_metrics(db, board_ids=None, sensor_type=None, start=None, end=None):
+  last_metrics = prepare_metrics(db, LastMetric, board_ids, sensor_type, start, end)
 
   return last_metrics.all()
 
 
 def get_metrics(db, board_ids=None, sensor_type=None, start=None, end=None, last_available=None):
-  s = create_session(db)
-
-  if board_ids is not None and not isinstance(board_ids, list):
-    board_ids = [board_ids]
-
-  metrics = s.query(Metric)
-
-  if sensor_type:
-    metrics = metrics.filter(Metric.sensor_type == sensor_type)
-
-  if board_ids:
-    metrics = metrics.filter(Metric.board_id.in_(board_ids))
-
-  if start:
-    metrics = metrics.filter(Metric.last_update >= start)
-
-  if end:
-    metrics = metrics.filter(Metric.last_update <= end)
+  metrics = prepare_metrics(db, Metric, board_ids, sensor_type, start, end)
 
   if last_available:
     metrics = metrics.order_by(desc(Metric.id)).limit(last_available).from_self()

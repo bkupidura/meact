@@ -37,13 +37,13 @@ class MgwThread(mqtt.MqttThread):
     'fence': 1
   }
 
-  def __init__(self, db_file, boards_map, sensors_map, action_config, mqtt_config):
+  def __init__(self, db_string, boards_map, sensors_map, action_config, mqtt_config):
     super(MgwThread, self).__init__()
     self.name = 'mgw'
     self.enabled = threading.Event()
     self.enabled.set()
     self.action_status = {}
-    self.db_file = db_file
+    self.db_string = db_string
     self._db = None
     self.boards_map = boards_map
     self.sensors_map = sensors_map
@@ -60,7 +60,7 @@ class MgwThread(mqtt.MqttThread):
     sensor_data = utils.load_json(msg.payload)
 
     if not self._db:
-      self._db = database.connect(self.db_file)
+      self._db = database.connect(self.db_string)
 
     sensor_data, sensor_config = self._prepare_data(sensor_data)
 
@@ -228,23 +228,23 @@ def main():
   sensors_map = utils.load_config(args.dir + '/sensors.config.json')
   boards_map = utils.load_config(args.dir + '/boards.config.json')
 
-  db = database.connect(conf['db_file'])
+  db = database.connect(conf['db_string'])
 
   if args.create_db:
     database.create_db(db, boards_map)
-    print('Database created in {}'.format(conf['db_file']))
+    print('Database created in {}'.format(conf['db_string']))
     sys.exit(0)
 
   if args.sync_db_desc:
     database.sync_boards(db, boards_map)
-    print('Syned boards in {}'.format(conf['db_file']))
+    print('Syned boards in {}'.format(conf['db_string']))
     sys.exit(0)
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
   mgw = MgwThread(
-    db_file=conf['db_file'],
+    db_string=conf['db_string'],
     boards_map=boards_map,
     sensors_map=sensors_map,
     action_config=conf['action_config'],
