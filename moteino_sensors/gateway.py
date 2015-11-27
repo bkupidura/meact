@@ -78,20 +78,7 @@ class MgwThread(mqtt.MqttThread):
     if not sensor_data:
       return
 
-    try:
-      self._db.execute(
-        "INSERT INTO metrics(board_id, sensor_type, data) VALUES(?, ?, ?)",
-        (sensor_data['board_id'], sensor_data['sensor_type'], sensor_data['sensor_data'])
-      )
-      self._db.commit()
-    except (sqlite3.IntegrityError) as e:
-      LOG.error("Got exception '%' in mgw thread", e)
-    except (sqlite3.OperationalError) as e:
-      time.sleep(1 + random.random())
-      try:
-        self._db.commit()
-      except (sqlite3.OperationalError) as e:
-        LOG.error("Got exception '%' in mgw thread", e)
+    database.insert_metric(self._db, sensor_data)
 
   def _put_in_queue(self, sensor_data, sensor_config):
     if not sensor_data or not sensor_config:
