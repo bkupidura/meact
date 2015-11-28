@@ -180,3 +180,18 @@ def get_metrics(db, board_ids=None, sensor_type=None, start=None, end=None, last
     metrics = metrics.order_by(desc(Metric.id)).limit(last_available).from_self()
 
   return metrics.order_by(Metric.id).all()
+
+
+def update_metric(db, metric_id=None, sensor_data=None):
+  if metric_id and sensor_data:
+    s = create_session(db)
+    metric = s.query(Metric).filter(Metric.id == metric_id).first()
+    metric.sensor_data = sensor_data
+    s.commit()
+
+
+def delete_metrics(db, record_ids=None):
+  if record_ids:
+    s = create_session(db)
+    query = s.query(Metric).filter(Metric.id.in_(record_ids)).delete('fetch')
+    s.commit()
