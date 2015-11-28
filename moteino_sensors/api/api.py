@@ -63,7 +63,7 @@ def set_action_mqtt():
 @app.route('/api/node', method=['GET', 'POST'])
 @app.route('/api/node/', method=['GET', 'POST'])
 @app.route('/api/node/<board_id>', method=['GET', 'POST'])
-def get_nodes(board_id=False):
+def get_nodes(board_id=None):
   now = int(time.time())
   start = now - 60 * 60 * 1
   end = now
@@ -72,7 +72,7 @@ def get_nodes(board_id=False):
     start = bottle.request.json.get('start', start)
     end = bottle.request.json.get('end', end)
 
-  boards = database.get_boards(app.config['db'])
+  boards = database.get_boards(app.config['db'], board_ids=board_id)
 
   output = list()
   for board in boards:
@@ -87,7 +87,7 @@ def get_nodes(board_id=False):
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
-def get_graph(graph_type='uptime'):
+def get_graph(graph_type=None):
   now = int(time.time())
   start = now - 60 * 60 * 24
   end = now
