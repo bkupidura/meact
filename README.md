@@ -1,22 +1,36 @@
 # mgw - Moteino Gateway
-MGW is responsible for handling metric reported by Moteino boards (http://lowpowerlab.com/moteino/).
-It reads input from serial console and perform various actions.
+Originaly MGW was designed to handle metrics reported by
+Moteino boards (http://lowpowerlab.com/moteino/).
+
+Now MGW can handle metrics reported by any kind of software/hardware.
+Main MGW task is to get metric from external stuff, write it to DB and perform
+various action.
+
+How to feed MGW:
+* via serial port
+* via HTTP API
+* via MQTT
+
+MGW except input in format:
+* serial - [board_id][sensor_type:sensor_data]
+* HTTP API - {"data": {"board_id": "board_id", "sensor_type": "sensor_type", "sensor_data": "sensor_data"}, "topic": "mgw/metric"}
+* MQTT - '{"board_id": "board_id", "sensor_type": "sensor_type", "sensor_data": "sensor_data"}'
 
 MGW contains a few sub services:
 * Gateway - main daemon, resposible for saving metrics and executing actions
 * SRL - serial daemon, responsible for reading metrics from serial and sending to gateway
 * DBAQ - db asyncrhonous query, responsible for query DB
-* API - JSON API to talk to other services via MQTT/query DB.
-* Fence - script which handle 'armed' status (it use external geofancing api to make a decision).
+* API - JSON API to talk to other services via MQTT/query DB
+* Fence - script which handle 'armed' status (it use external geofancing api to make a decision)
 
 ## Hardware:
-* Moteino boards (+FTDI adapter to upload board code).
-* Rassberry PI (or any other python compatible computer).
+* Moteino boards (+FTDI adapter to upload board code)
+* Rassberry PI (or any other python compatible computer)
 
 ## What we use:
 * python
 * mqtt/paho/mosquitto
-* sqlite
+* sqlalchemy/sqlite
 * bottle
 * highcharts/highstock (graphs)
 * handlebars (templates)
@@ -59,19 +73,7 @@ $ moteino-srl --dir /dir/with/mgw/srl/config
 $ moteino-dbaq --dir /dir/with/mgw/dbaq/config
 ```
 
-### sensors.config.json
-List of metrics you want to handle.
-Fields:
-* 'action' - list of actions (python functions) to execute in case of failure, it supports nested failback.
-* 'check_if_armed' - check if status['armed'] should be true, supports exceptions.
-* 'action_interval' - how offen perform action.
-* 'threshold' - check if value reported by board should trigger action (we use python lambda here).
-* 'fail_count' - how many failures should occur before action.
-* 'fail_interval' - time window for fail_count, older values will be removed.
-* 'message_template' - format message for notify actions
-* 'priority' - priority for given metric, lowest metrics will be handled first
-
-### Supervisor
+## Supervisor
 > [program:moteino-gateway]
 
 > command=/usr/local/bin/moteino-gateway --dir /root/mgw/main
@@ -92,8 +94,7 @@ Fields:
 
 > command=/usr/local/bin/moteino-dbaq --dir /root/mgw/main/dbaq
 
-## Running tests
-
+### Running tests
 MGW has a bunch of tests that helps in development. Tests are run by `pytest` with
 `tox` as automation tool.
 
@@ -109,7 +110,19 @@ Then run `tox` (it will prepare virtual environment and install all requirements
 $ tox
 ```
 
-## status
+### sensors.config.json
+List of metrics you want to handle.
+Fields:
+* 'action' - list of actions (python functions) to execute in case of failure, it supports nested failback
+* 'check_if_armed' - check if status['armed'] should be true, supports exceptions
+* 'action_interval' - how offen perform action
+* 'threshold' - check if value reported by board should trigger action (we use python lambda here)
+* 'fail_count' - how many failures should occur before action
+* 'fail_interval' - time window for fail_count, older values will be removed
+* 'message_template' - format message for notify actions
+* 'priority' - priority for given metric, lowest metrics will be handled first
+
+### status
 This is internal dict used to synchronize service status.
 
 Every service can update status with MQTT topic 'mgmt/status'
@@ -131,14 +144,16 @@ MGW stores 'armed' status inside.
 All updates to 'mgmt/status' should be send with retain=True, or by dedicated
 function mqttThread.public_status().
 
-## actions
+### actions
 Every action is simple python function which will do 'smth'.
 Gateway execute actions with multiprocessing.Process().
+
+List of actions can be found inside action/ directory.
 
 Every action should have defined TIMEOUT and return proper exit code (0 sucess, >0 error).
 Exitcode 255 is used by gateway for action which didn't finish before TIMEOUT.
 
-## MQTT
+### MQTT
 MQTT based services subscribes to different topics based on own config.
 
 If in config['mqtt']['topic'] 'service_name' is defined service will subscribe
@@ -174,7 +189,7 @@ Ex.
 
 MGW (gateway) service will subscribe to topic 'mgw/#' and 'mgmt/status'.
 
-## Moteino-srl
+### Moteino-srl
 SRL expect on serial input in format:
 
 [BOARD_ID][METRIC_NAME:METRIC_VALUE]
@@ -194,7 +209,7 @@ This can be used to ping gateway:
 
 > mosquitto_pub -t 'srl/write' -m '1:1'
 
-## Moteino-gateway
+### Moteino-gateway
 Gateway handle MQTT traffic on topics:
 * conf['mgw']+'/metric' - put metric to DB and perform action
 * conf['mgw']+'/action' - perform action
@@ -206,18 +221,18 @@ Lowest priority will be handled first.
 If priority is missing from sensors.config.json, default value is 500.
 
 Gateway expect on MQTT input in format:
-{"board_id": "ID", "sensor_type": "TYPE", "sensor_data": "VALUE"}
+{"board_id": "BOARD_ID", "sensor_type": "SENSOR_TYPE", "sensor_data": "SENSOR_DATA"}
 
 Ex.
 {"board_id": "10", "sensor_type": "voltage", "sensor_data": "1"}
 
-## Moteino-dbaq
+### Moteino-dbaq
 Used to perform asynchronous db queries.
 By default there is only one query defined 'msd' - Missing Sensor Detector.
 
 When MSD find any missing board it send data over MQTT to topic conf['mgw']+'/action'.
 
-## Moteino-fence
+### Moteino-fence
 Based on external geofence API it will handle 'armed' status.
 
 Set armed to 1 when:
@@ -268,7 +283,7 @@ Update status:
 
 > curl example.com/geofence.php --data 'device=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&trigger=exited'
 
-## Moteino-API
+### Moteino-API
 API delivers static dashboard and way to communicate over MQTT.
 
 All customization can be done inside api/static/mappings.js.
@@ -284,15 +299,10 @@ API endpoints:
 Send data to MQTT via API:
 > curl localhost:8080/api/action/mqtt -H "Content-Type: application/json" --data '{"data":{"asd": 10, "bsd": 20}, "topic":"xyz"}'
 
-## Aggregate metric
+### Aggregate metric
 In example dir you can find python script which can be used to aggregate data in DB.
 
-Avarage environment:
-* 15 boards
-* each board reports 4 values
-* each board reports every 120s
-
-5k records every week.
+Avarage environment can generate 300k records every week (15 boards, each board report 4 metrics every 120s).
 
 Aggregate_metric parameters:
 * db-string - sqlalchemy db connection string
