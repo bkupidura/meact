@@ -183,9 +183,9 @@ def get_metrics(db, board_ids=None, sensor_type=None, start=None, end=None, last
 
 
 def update_metric(db, metric_id=None, sensor_data=None):
-  if metric_id and sensor_data:
-    s = create_session(db)
-    metric = s.query(Metric).filter(Metric.id == metric_id).first()
+  s = create_session(db)
+  metric = s.query(Metric).filter(Metric.id == metric_id).first()
+  if metric and sensor_data:
     metric.sensor_data = sensor_data
     s.commit()
 
