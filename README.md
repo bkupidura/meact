@@ -86,11 +86,11 @@ Fields:
 
 > [program:moteino-srl]
 
-> command=/usr/local/bin/moteino-srl --dir /root/mgw/main/fence
+> command=/usr/local/bin/moteino-srl --dir /root/mgw/main/srl
 
 > [program:moteino-dbaq]
 
-> command=/usr/local/bin/moteino-dbaq --dir /root/mgw/main/fence
+> command=/usr/local/bin/moteino-dbaq --dir /root/mgw/main/dbaq
 
 ## Running tests
 
@@ -271,15 +271,14 @@ Update status:
 ## Moteino-API
 API delivers static dashboard and way to communicate over MQTT.
 
-Graph configuration is available inside api/static/graphs.js.
-
-Node commands configuration is available inside api/static/commands.js.
+All customization can be done inside api/static/mappings.js.
 
 API endpoints:
 * GET /api/action/status - get current MQTT status
 * POST /api/action/status - set status and publish it to MQTT
 * POST /api/action/mqtt - send message to MQTT
-* GET/POST /api/action/node/<node_id> - get latests metrics (from DB) for given/all nodes
+* GET/POST /api/action/node - get latests metrics (from DB) for all boards
+* GET/POST /api/action/node/<board_id> - get latests metrics (from DB) for given board
 * GET/POST /api/action/graph/<graph_type> - get metrics of given type (used by graphs)
 
 Send data to MQTT via API:
