@@ -38,14 +38,13 @@ def aggregate_metrics(db, start, end, sensor_type, execute):
 
       new_records[metric.sensor_type].setdefault('boards', {})
       new_records[metric.sensor_type].setdefault('type', data_type)
+      if data_type == float:
+        new_records[metric.sensor_type].setdefault('prec', len(metric.sensor_data.split('.')[1]))
 
     new_records[metric.sensor_type]['boards'].setdefault(metric.board_id, {})
     new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('sensor_sum', 0)
     new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('sensor_num', 0)
     new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('id', metric.id)
-
-    if data_type == float:
-      new_records[metric.sensor_type].setdefault('prec', len(metric.sensor_data.split('.')[1]))
 
     if new_records[metric.sensor_type]['boards'][metric.board_id]['id'] != metric.id:
       ids_to_delete.append(metric.id)
