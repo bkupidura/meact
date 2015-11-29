@@ -284,3 +284,38 @@ API endpoints:
 
 Send data to MQTT via API:
 > curl localhost:8080/api/action/mqtt -H "Content-Type: application/json" --data '{"data":{"asd": 10, "bsd": 20}, "topic":"xyz"}'
+
+## Aggregate metric
+In example dir you can find python script which can be used to aggregate data in DB.
+
+Avarage environment:
+* 15 boards
+* each board reports 4 values
+* each board reports every 120s
+
+5k records every week.
+
+Aggregate_metric parameters:
+* db-string - sqlalchemy db connection string
+* start - seconds since epoch, we are interested in data >= start
+* end - seconds since epoch, we are interested in data <= end
+* policy - for what time period store data, 1 record per hour/day/week/month
+* execute - do real data aggregation, by default (without this argument) aggregate_metric don't change database
+
+Examples:
+
+Store 1 sensor_type+board_id pair per hour for range [2 weeks ago - 1 week ago]
+
+> python aggregate_metric.py --db-string 'sqlite:////etc/mgw/mgw.db' --start $(date +%s -d '2 weeks ago') --end $(date +%s -d '1 weeks ago') --execute --policy hour
+
+Store 1 sensor_type+board_id pair per day for range [1 month ago - 2 weeks ago]
+
+> python aggregate_metric.py --db-string 'sqlite:////etc/mgw/mgw.db' --start $(date +%s -d '1 months ago') --end $(date +%s -d '2 weeks ago') --execute --policy day
+
+Store 1 sensor_type+board_id pair per week for range [6 months ago - 1 month ago]
+
+> python aggregate_metric.py --db-string 'sqlite:////etc/mgw/mgw.db' --start $(date +%s -d '6 months ago') --end $(date +%s -d '1 months ago') --execute --policy week
+
+Store 1 sensor_type+board_id pair per month for range [1 year ago - 6 months ago]
+
+> python aggregate_metric.py --db-string 'sqlite:////etc/mgw/mgw.db' --start $(date +%s -d '1 years ago') --end $(date +%s -d '6 months ago') --execute --policy month

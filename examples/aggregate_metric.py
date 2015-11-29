@@ -20,7 +20,7 @@ def check_data_type(type_to_check, current_type, sensor_data):
 
 def aggregate_metrics(db, start, end, sensor_type, execute):
   metrics = database.get_metrics(db, start=start, end=end, sensor_type=sensor_type)
-  LOG.info('Got %d metrics', len(metrics))
+  LOG.info('Got %d metrics between %s and %s', len(metrics), start, end)
 
   new_records = dict()
   ids_to_delete = []
@@ -73,11 +73,20 @@ def aggregate_metrics(db, start, end, sensor_type, execute):
   if execute:
     database.delete_metrics(db, ids_to_delete)
 
+# Map policy name to seconds
+policy_map = {
+  'hour': 60*60,
+  'day': 60*60*24,
+  'week': 60*60*24*7,
+  'month': 60*60*24*7*4
+}
+
 def main():
   parser = ArgumentParser('Aggregate metrics from MGW')
   parser.add_argument('--start', required=True, help='Start time for aggregate (seconds since epoch)')
   parser.add_argument('--end', required=True, help='End time for aggregate (seconds since epoch)')
   parser.add_argument('--db-string', required=True, help='Connection string for DB. Ex. sqlite:////etc/mgw/mgw.db')
+  parser.add_argument('--policy', required=True, help='Aggregate policy, aggregate per hour/day/week/month')
   parser.add_argument('--sensor-type', required=False, help='sensor_type for aggregate, if missing we will aggregate all sensor_type')
   parser.add_argument('--execute', required=False, help='Execute data aggregation, without this DB will not be changed', action="store_true")
   args = parser.parse_args()
@@ -88,17 +97,21 @@ def main():
 
   LOG.info("""Starting metric aggregation for data:
     db = '%s'
-    last_update >= '%s'
-    last_update <= '%s'
+    policy = '%s'
     sensor_type == '%s'
   """,
     args.db_string,
-    args.start,
-    args.end,
+    args.policy,
     args.sensor_type,
   )
 
-  aggregate_metrics(db, args.start, args.end, args.sensor_type, args.execute)
+  policy_start = int(args.start)
+  policy_end = int(args.start) + policy_map[args.policy]
+
+  while (policy_end <= int(args.end)):
+    aggregate_metrics(db, policy_start, policy_end, args.sensor_type, args.execute)
+    policy_start += policy_map[args.policy]
+    policy_end += policy_map[args.policy]
 
 if __name__ == "__main__":
   main()
