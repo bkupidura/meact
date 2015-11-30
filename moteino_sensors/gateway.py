@@ -19,6 +19,17 @@ class ActionDetailsAdapter(dict):
   Provides helpers and functions that allows
   to easily work on action details
   """
+  def build_defaults(self, index):
+    self.setdefault('check_if_armed', {'default': True})
+    self.setdefault('action_interval', 0)
+    self.setdefault('threshold', 'lambda x: True')
+    self.setdefault('fail_count', 0)
+    self.setdefault('fail_interval', 600)
+    self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+
+    self['check_if_armed'].setdefault('except', [])
+    self['index'] = index
+
   def should_check_if_armed(self, board_id):
     """Should action be checked for given board?"""
     return (
@@ -156,18 +167,14 @@ class MgwThread(mqtt.MqttThread):
 
     for index, action_details in enumerate(actions_details['actions']):
 
-      action_details.setdefault('check_if_armed', {'default': True})
-      action_details['check_if_armed'].setdefault('except', [])
-      action_details.setdefault('action_interval', 0)
-      action_details.setdefault('threshold', 'lambda x: True')
-      action_details.setdefault('fail_count', 0)
-      action_details.setdefault('fail_interval', 600)
-      action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-      action_details['index'] = index
+      action_details = ActionDetailsAdapter(action_details)
+      action_details.build_defaults(index)
 
       if not utils.validate_action_details(action_details):
         LOG.warning("Fail to validate data '%s', ignoring..", action_details)
         return None
+      else:
+        actions_details['actions'][index] = action_details
 
     return actions_details
 
@@ -208,10 +215,7 @@ class MgwThread(mqtt.MqttThread):
   def _action_helper(self, data, actions_details, action_config=None):
 
     for action_details in actions_details['actions']:
-      action_details = ActionDetailsAdapter(action_details)
-
       LOG.debug("Action helper '%s' '%s'", data, action_details)
-      now = int(time.time())
 
       self.action_status.build_defaults(data['board_id'],
               action_details['index'],
