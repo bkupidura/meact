@@ -10,7 +10,7 @@ def send_mail(data, action_config):
   if not action_config.get('enabled'):
     sys.exit(1)
 
-  LOG.info('Sending mail')
+  LOG.info('Sending mail via SMTP')
 
   message = "From: {sender}\nTo: {recipient}\nSubject: {subject}\n\n{msg}\n\n".format(msg=data['message'], **action_config)
   try:

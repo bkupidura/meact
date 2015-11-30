@@ -26,7 +26,7 @@
     "priority": 0,
     "actions": [
       {
-      "action": [{"name": "send_sms_at", "failback": [{"name": "send_sms", "failback": [{"name": "send_mail"}]}]}, {"name": "log"}],
+      "action": [{"name": "send_sms_at", "failback": [{"name": "send_bulksms", "failback": [{"name": "send_mail"}]}]}, {"name": "log"}],
       "check_if_armed": {"default": 1},
       "action_interval": 360,
       "threshold": "lambda x: int(x)==1",

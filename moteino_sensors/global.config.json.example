@@ -3,7 +3,7 @@
     "level": 20
   },
   "action_config": {
-    "send_sms": {
+    "send_bulksms": {
       "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
       "user": "user",
       "password": "password",
