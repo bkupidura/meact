@@ -60,7 +60,7 @@ CREATE TRIGGER insert_metric
     SELECT 1 FROM last_metrics WHERE board_id = new.board_id and sensor_type = new.sensor_type
   )
   BEGIN
-    INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.sensor_data);
+    INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.sensor_data, new.last_update);
   END;
 """)
 

@@ -90,8 +90,7 @@ class MgwThread(mqtt.MqttThread):
     self.enabled = threading.Event()
     self.enabled.set()
     self.action_status = ActionStatusAdapter()
-    self.db_string = db_string
-    self._db = None
+    self.db = database.connect(db_string)
     self.boards_map = boards_map
     self.sensors_map = sensors_map
     self.action_config = action_config
@@ -105,9 +104,6 @@ class MgwThread(mqtt.MqttThread):
 
   def _on_message_metric(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
-
-    if not self._db:
-      self._db = database.connect(self.db_string)
 
     sensor_data, sensor_config = self._prepare_data(sensor_data)
 
@@ -125,7 +121,7 @@ class MgwThread(mqtt.MqttThread):
     if not sensor_data:
       return
 
-    database.insert_metric(self._db, sensor_data)
+    database.insert_metric(self.db, sensor_data)
 
   def _put_in_queue(self, sensor_data, sensor_config):
     if not sensor_data or not sensor_config:
