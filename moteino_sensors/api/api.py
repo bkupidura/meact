@@ -4,11 +4,11 @@ import os
 import time
 
 import bottle
-import bottle.ext.sqlite
 import netaddr
 
 from moteino_sensors import mqtt
 from moteino_sensors import utils
+from moteino_sensors import database
 
 
 app = bottle.Bottle()
@@ -62,8 +62,8 @@ def set_action_mqtt():
 
 @app.route('/api/node', method=['GET', 'POST'])
 @app.route('/api/node/', method=['GET', 'POST'])
-@app.route('/api/node/<node_id>', method=['GET', 'POST'])
-def get_nodes(db, node_id=False):
+@app.route('/api/node/<board_id>', method=['GET', 'POST'])
+def get_nodes(board_id=None):
   now = int(time.time())
   start = now - 60 * 60 * 1
   end = now
@@ -72,26 +72,22 @@ def get_nodes(db, node_id=False):
     start = bottle.request.json.get('start', start)
     end = bottle.request.json.get('end', end)
 
-  if (node_id):
-    node_id = str(node_id)
-    desc = dict(db.execute('SELECT board_id,board_desc FROM board_desc where board_id=?', (node_id, )).fetchall())
-  else:
-    desc = dict(db.execute('SELECT board_id,board_desc FROM board_desc').fetchall())
+  boards = database.get_boards(app.config['db'], board_ids=board_id)
 
   output = list()
-  for node in desc:
-    o_metric = list()
-    metrics = db.execute('SELECT sensor_type,data FROM last_metrics WHERE board_id=? and last_update >= ? and last_update <= ?',
-      (node, start, end)).fetchall()
+  for board in boards:
+    output.append({"name": board.board_id, "desc": board.board_desc, "data": []})
+
+    metrics = database.get_last_metrics(app.config['db'], board_ids=board.board_id, start=start, end=end)
+
     for metric in metrics:
-      o_metric.append(tuple(metric))
-    output.append({"name": node, "desc": desc[node], "data": o_metric})
+      output[-1]['data'].append((metric.sensor_type, metric.sensor_data))
 
   return json.dumps(output)
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
-def get_graph(db, graph_type='uptime'):
+def get_graph(graph_type=None):
   now = int(time.time())
   start = now - 60 * 60 * 24
   end = now
@@ -102,30 +98,25 @@ def get_graph(db, graph_type='uptime'):
     end = bottle.request.json.get('end', end)
     last_available = bottle.request.json.get('last_available', last_available)
 
-  graph_type = str(graph_type)
+  boards = database.get_boards(app.config['db'])
 
-  nodes = db.execute('SELECT board_id FROM last_metrics WHERE sensor_type = ?', (graph_type, )).fetchall()
+  board_ids = [board.board_id for board in boards]
+  board_desc = dict((board.board_id, board.board_desc) for board in boards)
+
+  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, sensor_type=graph_type)
 
   output = list()
 
-  for node in nodes:
-    o_metric = list()
-    node_id = node[0]
+  for last_metric in last_metrics:
+    output.append({"name": board_desc[last_metric.board_id], "data": []})
 
-    desc = dict(db.execute('SELECT board_id,board_desc FROM board_desc WHERE board_id=?', (node_id, )).fetchall())
-    metrics = db.execute('SELECT last_update,data FROM metrics WHERE sensor_type = ? AND board_id = ? AND last_update >= ? AND last_update <= ?',
-      (graph_type, node_id, start, end)).fetchall()
-
-    if (len(metrics) == 0 and last_available):
-      metrics = db.execute('''SELECT last_update,data FROM (SELECT id,last_update,data from metrics WHERE
-        sensor_type = ? AND board_id = ? ORDER BY id DESC LIMIT ?) order by id''',
-        (graph_type, node_id, last_available)).fetchall()
+    metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, start=start, end=end)
+    if not metrics and last_available:
+      metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, last_available=last_available)
 
     for metric in metrics:
-      tmp = ((metric[0] * 1000), float(metric[1]))
-      o_metric.append(tmp)
-
-    output.append({"name": desc[node_id], "data": o_metric})
+      data = ((metric.last_update * 1000), float(metric.sensor_data))
+      output[-1]['data'].append(data)
 
   return json.dumps(output)
 
@@ -159,8 +150,7 @@ def main():
   app.config['mqtt'] = SyncThread(app.config['appconfig'])
   app.config['mqtt'].start()
 
-  plugin = bottle.ext.sqlite.Plugin(dbfile=app.config['appconfig']['db'])
-  app.install(plugin)
+  app.config['db'] = database.connect(app.config['appconfig']['db_string'])
 
   app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'])
 

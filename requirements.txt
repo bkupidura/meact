@@ -1,6 +1,5 @@
 argparse
 bottle
-bottle-sqlite
 netaddr
 pyserial
 requests
@@ -8,3 +7,4 @@ urllib3
 python-gsmmodem
 paho-mqtt
 cerberus
+sqlalchemy

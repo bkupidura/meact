@@ -34,5 +34,5 @@
       "mgmt": "mgmt"
     }
   },
-  "db_file": "/etc/mgw/mgw.db"
+  "db_string": "sqlite:////etc/mgw/mgw.db"
 }

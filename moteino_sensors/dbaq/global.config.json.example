@@ -3,7 +3,7 @@
     "query": "SELECT board_id,last_update FROM (SELECT board_id,max(last_update) as last_update FROM last_metrics GROUP BY board_id) WHERE STRFTIME('%s', 'now')-last_update>300",
     "loop_sleep": 60
   },
-  "db_file": "/etc/mgw/mgw.db",
+  "db_string": "sqlite:////etc/mgw/mgw.db",
   "mqtt": {
     "server": "localhost",
     "topic": {

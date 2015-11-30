@@ -57,13 +57,16 @@ def validate_action_details(data):
             'fail_count': {'required': True, 'type': 'integer', 'min': 0},
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
             'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'priority': {'required': True, 'type': 'integer', 'min': 0}
+            'index': {'required': True, 'type': 'integer', 'min': 0}
             }
   v = ActionValidator()
   return v.validate(data, schema)
 
 
-def create_logger(conf):
+def create_logger(conf=None):
+  if conf is None:
+    conf = {}
+
   level = conf.get('level', logging.INFO)
   log_file = conf.get('file')
 

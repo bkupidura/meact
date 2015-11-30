@@ -1,76 +1,197 @@
-import sqlite3
+import time
 
-from moteino_sensors import utils
-
-
-BOARDS_TABLE_SQL = """
-DROP TABLE IF EXISTS board_desc;
-CREATE TABLE board_desc (
-  board_id TEXT PRIMARY KEY,
-  board_desc TEXT
-);
-"""
+from sqlalchemy import Column, Integer, Text, Index, ForeignKey, desc, DDL, event, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 
-METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS metrics;
-CREATE TABLE metrics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  board_id TEXT, sensor_type TEXT,
-  last_update TIMESTAMP DEFAULT (STRFTIME('%s', 'now')),
-  data TEXT DEFAULT NULL
-);
+Base = declarative_base()
 
-DROP INDEX IF EXISTS idx_board_id;
-CREATE INDEX idx_board_id ON metrics (board_id, sensor_type, last_update, data);
-"""
+class Metric(Base):
+  __tablename__ = 'metrics'
+
+  id = Column(Integer, primary_key=True)
+  board_id = Column(Text, ForeignKey("boards.board_id"), nullable=False)
+  sensor_type = Column(Text, nullable=False)
+  sensor_data = Column(Text, nullable=False)
+  last_update = Column(Integer, nullable=False)
+
+  __table_args__ = (Index('idx_metrics', 'board_id', 'sensor_type', 'sensor_data', 'last_update'), )
+
+  def __repr__(self):
+    return "<Metric(board_id='%s', sensor_type='%s', sensor_data='%s', 'last_update'='%s')>" % (
+            self.board_id,
+            self.sensor_type,
+            self.sensor_data,
+            self.last_update)
 
 
-LAST_METRICS_TABLE_SQL = """
-DROP TABLE IF EXISTS last_metrics;
-CREATE TABLE last_metrics (
-  board_id TEXT,
-  sensor_type TEXT,
-  last_update TIMESTAMP,
-  data TEXT
-);
-DROP TRIGGER IF EXISTS insert_metric;
+class LastMetric(Base):
+  __tablename__ = 'last_metrics'
+
+  board_id = Column(Text, ForeignKey("boards.board_id"), nullable=False, primary_key=True)
+  sensor_type = Column(Text, nullable=False, primary_key=True)
+  sensor_data = Column(Text, nullable=False)
+  last_update = Column(Integer, nullable=False)
+
+  def __repr__(self):
+    return "<Metric(board_id='%s', sensor_type='%s', sensor_data='%s', 'last_update'='%s')>" % (
+            self.board_id,
+            self.sensor_type,
+            self.sensor_data,
+            self.last_update)
+
+
+class Board(Base):
+  __tablename__ = 'boards'
+
+  board_id = Column(Text, primary_key=True)
+  board_desc = Column(Text, nullable=False)
+
+  def __repr__(self):
+    return "<Metric(board_id='%s', board_desc='%s')>" % (
+            self.board_id,
+            self.board_desc)
+
+
+TRIGGER_SQLITE_INSERT = DDL("""
 CREATE TRIGGER insert_metric
   INSERT ON metrics WHEN NOT EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+    SELECT 1 FROM last_metrics WHERE board_id = new.board_id and sensor_type = new.sensor_type
   )
-BEGIN
-  INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.last_update, new.data);
-END;
+  BEGIN
+    INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.sensor_data, new.last_update);
+  END;
+""")
 
-DROP TRIGGER IF EXISTS update_metric;
+TRIGGER_SQLITE_UPDATE = DDL("""
 CREATE TRIGGER update_metric
   INSERT ON metrics WHEN EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id=new.board_id and sensor_type=new.sensor_type
+    SELECT 1 FROM last_metrics WHERE board_id = new.board_id and sensor_type = new.sensor_type
   )
-BEGIN
-  UPDATE last_metrics SET data=new.data, last_update=new.last_update WHERE board_id==new.board_id and sensor_type==new.sensor_type;
-END;
-"""
+  BEGIN
+    UPDATE last_metrics SET sensor_data = new.sensor_data, last_update = new.last_update WHERE board_id = new.board_id and sensor_type = new.sensor_type;
+  END;
+""")
+
+event.listen(
+  Base.metadata,
+  'after_create',
+  TRIGGER_SQLITE_INSERT.execute_if(dialect='sqlite')
+)
+event.listen(
+  Base.metadata,
+  'after_create',
+  TRIGGER_SQLITE_UPDATE.execute_if(dialect='sqlite')
+)
+
+def connect(connect_string):
+  return create_engine(connect_string)
 
 
-def connect(db_file):
-  return sqlite3.connect(db_file)
+def create_session(db):
+  Session = sessionmaker()
+  Session.configure(bind=db)
+  return Session()
 
 
 def create_db(db, boards_map):
-  sync_boards(db, boards_map)
+  Base.metadata.drop_all(db)
+  Base.metadata.create_all(db)
 
-  db.executescript(METRICS_TABLE_SQL)
-  db.executescript(LAST_METRICS_TABLE_SQL)
+  sync_boards(db, boards_map)
 
 
 def sync_boards(db, boards_map):
-  """Wipes out `boards` table and repopulates it"""
-  db.executescript(BOARDS_TABLE_SQL)
+  s = create_session(db)
 
-  db.executemany(
-    "INSERT INTO board_desc(board_id, board_desc) VALUES(?, ?)",
-    boards_map.iteritems()
-  )
-  db.commit()
+  s.query(Board).delete()
+  for board in boards_map.iteritems():
+    b = Board(board_id=board[0], board_desc=board[1])
+    s.add(b)
+  s.commit()
+
+
+def insert_metric(db, sensor_data):
+  s = create_session(db)
+
+  now = int(time.time())
+
+  s.add(Metric(board_id = sensor_data['board_id'],
+          sensor_type = sensor_data['sensor_type'],
+          sensor_data = sensor_data['sensor_data'],
+          last_update = now))
+
+  s.commit()
+
+
+def prepare_board_ids(board_ids=None):
+  if board_ids is not None and not isinstance(board_ids, list):
+    return [board_ids]
+
+  return board_ids
+
+
+def get_boards(db, board_ids=None):
+  s = create_session(db)
+
+  board_ids = prepare_board_ids(board_ids)
+
+  boards = s.query(Board)
+
+  if board_ids:
+    boards = boards.filter(Board.board_id.in_(board_ids))
+
+  return boards.all()
+
+
+def prepare_metrics(db, table, board_ids=None, sensor_type=None, start=None, end=None):
+  board_ids = prepare_board_ids(board_ids)
+
+  s = create_session(db)
+
+  query = s.query(table)
+
+  if board_ids:
+    query = query.filter(table.board_id.in_(board_ids))
+
+  if sensor_type:
+    query = query.filter(table.sensor_type == sensor_type)
+
+  if start:
+    query = query.filter(table.last_update >= start)
+
+  if end:
+    query = query.filter(table.last_update <= end)
+
+  return query
+
+
+def get_last_metrics(db, board_ids=None, sensor_type=None, start=None, end=None):
+  last_metrics = prepare_metrics(db, LastMetric, board_ids, sensor_type, start, end)
+
+  return last_metrics.all()
+
+
+def get_metrics(db, board_ids=None, sensor_type=None, start=None, end=None, last_available=None):
+  metrics = prepare_metrics(db, Metric, board_ids, sensor_type, start, end)
+
+  if last_available:
+    metrics = metrics.order_by(desc(Metric.id)).limit(last_available).from_self()
+
+  return metrics.order_by(Metric.id).all()
+
+
+def update_metric(db, metric_id=None, sensor_data=None):
+  s = create_session(db)
+  metric = s.query(Metric).filter(Metric.id == metric_id).first()
+  if metric and sensor_data:
+    metric.sensor_data = sensor_data
+    s.commit()
+
+
+def delete_metrics(db, record_ids=None):
+  if record_ids:
+    s = create_session(db)
+    query = s.query(Metric).filter(Metric.id.in_(record_ids)).delete('fetch')
+    s.commit()
