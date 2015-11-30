@@ -84,7 +84,7 @@ class MgwThread(mqtt.MqttThread):
     if not sensor_data or not sensor_config:
       return
 
-    priority = sensor_config['priority']
+    priority = sensor_config[0]['priority']
 
     self.action_queue.put((priority, sensor_data, sensor_config))
 
@@ -109,26 +109,29 @@ class MgwThread(mqtt.MqttThread):
       return None
 
     sensor_type = sensor_data.get('sensor_type')
-    action_details = self.sensors_map.get(sensor_type)
+    actions_details = self.sensors_map.get(sensor_type)
 
-    if not action_details:
+    if not actions_details:
       LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
       return None
 
-    action_details.setdefault('check_if_armed', {'default': True})
-    action_details['check_if_armed'].setdefault('except', [])
-    action_details.setdefault('action_interval', 0)
-    action_details.setdefault('threshold', 'lambda x: True')
-    action_details.setdefault('fail_count', 0)
-    action_details.setdefault('fail_interval', 600)
-    action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-    action_details.setdefault('priority', 500)
+    for index, action_details in enumerate(actions_details):
 
-    if not utils.validate_action_details(action_details):
-      LOG.warning("Fail to validate data '%s', ignoring..", action_details)
-      return None
+      action_details.setdefault('check_if_armed', {'default': True})
+      action_details['check_if_armed'].setdefault('except', [])
+      action_details.setdefault('action_interval', 0)
+      action_details.setdefault('threshold', 'lambda x: True')
+      action_details.setdefault('fail_count', 0)
+      action_details.setdefault('fail_interval', 600)
+      action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+      action_details.setdefault('priority', 500)
+      action_details['index'] = index
 
-    return action_details
+      if not utils.validate_action_details(action_details):
+        LOG.warning("Fail to validate data '%s', ignoring..", action_details)
+        return None
+
+    return actions_details
 
   def _action_execute(self, data, actions, action_config):
     result = 0
@@ -164,40 +167,42 @@ class MgwThread(mqtt.MqttThread):
 
     return result
 
-  def _action_helper(self, data, action_details, action_config=None):
+  def _action_helper(self, data, actions_details, action_config=None):
 
-    action_details = ActionDetailsAdapter(action_details)
+    for action_details in actions_details:
+      action_details = ActionDetailsAdapter(action_details)
 
-    LOG.debug("Action helper '%s' '%s'", data, action_details)
-    now = int(time.time())
+      LOG.debug("Action helper '%s' '%s'", data, action_details)
+      now = int(time.time())
 
-    self.action_status.setdefault(data['board_id'], {})
-    self.action_status[data['board_id']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
+      self.action_status.setdefault(data['board_id'], {})
+      self.action_status[data['board_id']].setdefault(action_details['index'], {})
+      self.action_status[data['board_id']][action_details['index']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
 
-    self.action_status[data['board_id']][data['sensor_type']]['last_fail'] = \
-      [i for i in self.action_status[data['board_id']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+      self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'] = \
+        [i for i in self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
 
-    try:
-      data['message'] = action_details['message_template'].format(**data)
-    except (KeyError) as e:
-      LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
-      return
+      try:
+        data['message'] = action_details['message_template'].format(**data)
+      except (KeyError) as e:
+        LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
+        continue
 
-    if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
-      return
+      if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
+        continue
 
-    if not eval(action_details['threshold'])(data['sensor_data']):
-      return
+      if not eval(action_details['threshold'])(data['sensor_data']):
+        continue
 
-    if len(self.action_status[data['board_id']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
-      self.action_status[data['board_id']][data['sensor_type']]['last_fail'].append(now)
-      return
+      if len(self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
+        self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'].append(now)
+        continue
 
-    if (now - self.action_status[data['board_id']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
-      return
+      if (now - self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
+        continue
 
-    if self._action_execute(data, action_details['action'], action_config):
-      self.action_status[data['board_id']][data['sensor_type']]['last_action'] = now
+      if self._action_execute(data, action_details['action'], action_config):
+        self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_action'] = now
 
   def run(self):
     LOG.info('Starting')
