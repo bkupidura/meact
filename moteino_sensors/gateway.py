@@ -28,6 +28,42 @@ class ActionDetailsAdapter(dict):
     )
 
 
+class ActionStatusAdapter(dict):
+  """Adapter for action status
+
+  Provider helpers and functions that allows
+  to easily work with action status
+  """
+  def build_defaults(self, board_id, index, sensor_type):
+    self.setdefault(board_id, {})
+    self[board_id].setdefault(index, {})
+    self[board_id][index].setdefault(sensor_type, {'last_action': 0, 'last_fail': []})
+
+  def clean_failed(self, board_id, index, sensor_type, fail_interval):
+    now = int(time.time())
+    self[board_id][index][sensor_type]['last_fail'] = \
+      [i for i in self[board_id][index][sensor_type]['last_fail'] if now - i < fail_interval]
+
+  def check_failed_count(self, board_id, index, sensor_type, fail_count):
+    now = int(time.time())
+    failed = self[board_id][index][sensor_type]['last_fail']
+    if len(failed) <= fail_count - 1:
+      self[board_id][index][sensor_type]['last_fail'].append(now)
+      return False
+    return True
+
+  def check_last_action(self, board_id, index, sensor_type, action_interval):
+    now = int(time.time())
+    last_action = self[board_id][index][sensor_type]['last_action']
+    if now - last_action <= action_interval:
+      return False
+    return True
+
+  def update_last_action(self, board_id, index, sensor_type):
+    now = int(time.time())
+    self[board_id][index][sensor_type]['last_action'] = now
+
+
 class MgwThread(mqtt.MqttThread):
   status = {
     'mgw': 1,
@@ -42,7 +78,7 @@ class MgwThread(mqtt.MqttThread):
     self.name = 'mgw'
     self.enabled = threading.Event()
     self.enabled.set()
-    self.action_status = {}
+    self.action_status = ActionStatusAdapter()
     self.db_string = db_string
     self._db = None
     self.boards_map = boards_map
@@ -84,7 +120,10 @@ class MgwThread(mqtt.MqttThread):
     if not sensor_data or not sensor_config:
       return
 
-    priority = sensor_config[0]['priority']
+    if not 'priority' in sensor_config or not isinstance(sensor_config['priority'], int):
+      priority = 500
+    else:
+      priority = sensor_config['priority']
 
     self.action_queue.put((priority, sensor_data, sensor_config))
 
@@ -111,11 +150,11 @@ class MgwThread(mqtt.MqttThread):
     sensor_type = sensor_data.get('sensor_type')
     actions_details = self.sensors_map.get(sensor_type)
 
-    if not actions_details:
+    if not actions_details or 'actions' not in actions_details:
       LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
       return None
 
-    for index, action_details in enumerate(actions_details):
+    for index, action_details in enumerate(actions_details['actions']):
 
       action_details.setdefault('check_if_armed', {'default': True})
       action_details['check_if_armed'].setdefault('except', [])
@@ -124,7 +163,6 @@ class MgwThread(mqtt.MqttThread):
       action_details.setdefault('fail_count', 0)
       action_details.setdefault('fail_interval', 600)
       action_details.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-      action_details.setdefault('priority', 500)
       action_details['index'] = index
 
       if not utils.validate_action_details(action_details):
@@ -169,18 +207,22 @@ class MgwThread(mqtt.MqttThread):
 
   def _action_helper(self, data, actions_details, action_config=None):
 
-    for action_details in actions_details:
+    for action_details in actions_details['actions']:
       action_details = ActionDetailsAdapter(action_details)
 
       LOG.debug("Action helper '%s' '%s'", data, action_details)
       now = int(time.time())
 
-      self.action_status.setdefault(data['board_id'], {})
-      self.action_status[data['board_id']].setdefault(action_details['index'], {})
-      self.action_status[data['board_id']][action_details['index']].setdefault(data['sensor_type'], {'last_action': 0, 'last_fail': []})
+      self.action_status.build_defaults(data['board_id'],
+              action_details['index'],
+              data['sensor_type'])
+      self.action_status.clean_failed(data['board_id'],
+              action_details['index'],
+              data['sensor_type'],
+              action_details['fail_interval'])
 
-      self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'] = \
-        [i for i in self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'] if now - i < action_details['fail_interval']]
+      if not eval(action_details['threshold'])(data['sensor_data']):
+        continue
 
       try:
         data['message'] = action_details['message_template'].format(**data)
@@ -191,18 +233,22 @@ class MgwThread(mqtt.MqttThread):
       if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
         continue
 
-      if not eval(action_details['threshold'])(data['sensor_data']):
+      if not self.action_status.check_failed_count(data['board_id'],
+              action_details['index'],
+              data['sensor_type'],
+              action_details['fail_count']):
         continue
 
-      if len(self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail']) <= action_details['fail_count']-1:
-        self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_fail'].append(now)
+      if not self.action_status.check_last_action(data['board_id'],
+              action_details['index'],
+              data['sensor_type'],
+              action_details['action_interval']):
         continue
 
-      if (now - self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_action'] <= action_details['action_interval']):
-        continue
-
-      if self._action_execute(data, action_details['action'], action_config):
-        self.action_status[data['board_id']][action_details['index']][data['sensor_type']]['last_action'] = now
+      if self._action_execute(data,
+              action_details['action'],
+              action_config):
+        self.action_status.update_last_action(data['board_id'], action_details['index'], data['sensor_type'])
 
   def run(self):
     LOG.info('Starting')
