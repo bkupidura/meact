@@ -33,6 +33,11 @@
         {"id": "instapush-app-id", "secret": "instapush-app-secret"}
       ],
       "enabled": 0
+    },
+    "send_ifttt_maker": {
+      "endpoint": "https://maker.ifttt.com/trigger",
+      "auth_key": "authkey",
+      "enabled": 0
     }
   },
   "mqtt": {
