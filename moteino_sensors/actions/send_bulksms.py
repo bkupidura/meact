@@ -11,6 +11,19 @@ logging.getLogger("requests").setLevel(logging.CRITICAL)
 requests.packages.urllib3.disable_warnings()
 
 def send_bulksms(data, action_config):
+  """Send SMS via www.bulksms.com
+
+  Bulksms is HTTP<->SMS gateway.
+
+  MGW configuration:
+  action_config = {
+    "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
+    "user": "bulksms-user",
+    "password": "bulksms-password",
+    "recipient": ["your-number", "your-number2"],
+    "enabled": 1
+  }
+  """
   if not action_config.get('enabled'):
     sys.exit(1)
 

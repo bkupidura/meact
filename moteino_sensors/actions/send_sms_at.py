@@ -11,13 +11,22 @@ TIMEOUT=30
 logging.getLogger("gsmmodem.modem.GsmModem").setLevel(logging.CRITICAL)
 
 def send_sms_at(data, action_config):
+  """Send SMS via local modem with AT commands
+
+  MGW configuration:
+  action_config = {
+    "recipient": ["your-number", "your-number2'],
+    "port": "/dev/ttyUSB1",
+    "speed": 19200,
+    "enabled": 1
+  }
+  """
   if not action_config.get('enabled'):
     sys.exit(1)
 
   LOG.info('Sending SMS via AT')
 
   modem = GsmModem(action_config['port'], action_config['speed'])
-
 
   while True:
     try:

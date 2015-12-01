@@ -7,6 +7,20 @@ LOG = logging.getLogger(__name__)
 TIMEOUT=5
 
 def send_mail(data, action_config):
+  """Send mail via SMTP
+
+  MGW configuration:
+  action_config = {
+    "sender": "root@example.com",
+    "recipient": "user@example.com",
+    "subject": "RPI notification",
+    "host": "email-smtp.eu-west-1.amazonaws.com",
+    "port": 587,
+    "user": "user",
+    "password": "password",
+    "enabled": 1
+  }
+  """
   if not action_config.get('enabled'):
     sys.exit(1)
 
