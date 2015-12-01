@@ -16,7 +16,7 @@ default_action = {
   'threshold': 'lambda x: True',
   'fail_count': 0,
   'fail_interval': 0,
-  'priority': 0,
+  'index': 0,
   'message_template': 'Template message for {board_id}',
   'action': [{'name': 'action'}],
 }
@@ -129,10 +129,10 @@ def test_fail_interval(fail_interval, expected):
 
   assert ada == expected
 
-@pytest.mark.parametrize('priority, expected', integer_bigger_than_0_test_data)
-def test_fail_interval(priority, expected):
+@pytest.mark.parametrize('index, expected', integer_bigger_than_0_test_data)
+def test_index(index, expected):
   action_details = copy.deepcopy(default_action)
-  action_details['priority'] = priority
+  action_details['index'] = index
 
   ada = utils.validate_action_details(action_details)
 
