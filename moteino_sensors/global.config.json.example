@@ -25,6 +25,14 @@
       "port": "/dev/ttyUSB1",
       "speed": 19200,
       "enabled": 1
+    },
+    "send_instapush": {
+      "endpoint": "https://api.instapush.im/v1/post",
+      "event": "notification",
+      "apps": [
+        {"id": "instapush-app-id", "secret": "instapush-app-secret"}
+      ],
+      "enabled": 0
     }
   },
   "mqtt": {
