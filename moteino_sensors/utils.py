@@ -3,11 +3,15 @@ import json
 import logging
 import os
 import pkgutil
+import requests
 import sys
 
 from cerberus import Validator, cerberus
 
 from moteino_sensors import actions
+
+logging.getLogger("requests").setLevel(logging.CRITICAL)
+requests.packages.urllib3.disable_warnings()
 
 def load_config(config_name):
   if not os.path.isfile(config_name):
@@ -88,6 +92,19 @@ def create_arg_parser(description):
   parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
   return parser
 
+
+def http_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False, timeout=2):
+  try:
+    req = requests.request(method, url, params=params,
+            data=data, headers=headers, auth=auth, verify=verify_ssl, timeout=timeout)
+    req.raise_for_status()
+  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
+    LOG.error('Fail to connect to url %s', e)
+    return None
+
+  return req
+
+
 def load_json(data):
   try:
     return json.loads(data)
@@ -95,7 +112,7 @@ def load_json(data):
     return {}
 
 
-def _load_actions():
+def load_actions():
     mapping = {}
 
     prefix = actions.__name__ + '.'
@@ -109,4 +126,3 @@ def _load_actions():
     return mapping
 
 
-ACTIONS_MAPPING = _load_actions()

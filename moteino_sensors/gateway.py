@@ -181,7 +181,7 @@ class MgwThread(mqtt.MqttThread):
       LOG.debug("Action execute '%s'", a)
 
       action_name = a['name']
-      action_func = utils.ACTIONS_MAPPING.get(action_name)
+      action_func = ACTIONS_MAPPING.get(action_name)
       conf = action_config.get(action_name)
 
       if not action_func:
@@ -267,7 +267,7 @@ class MgwThread(mqtt.MqttThread):
 
 
 LOG = logging.getLogger(__name__)
-
+ACTIONS_MAPPING = utils.load_actions()
 
 def main():
   parser = utils.create_arg_parser('Moteino gateway')

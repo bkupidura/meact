@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import json
 import logging
-import requests
 import threading
 import time
 
@@ -23,9 +22,14 @@ class FenceThread(mqtt.MqttThread):
     self.loop_start()
     while True:
       self.enabled.wait()
-      req = api_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))
-      if req:
-        self._check_action(req)
+      req = utils.http_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))
+      try:
+        data = json.loads(req.text)
+      except (ValueError, TypeError) as e:
+        data = None
+
+      if data:
+        self._check_action(data)
       elif self.status.get('armed') == 0:
         self._set_armed()
       time.sleep(self.conf['loop_time'])
@@ -58,23 +62,6 @@ class FenceThread(mqtt.MqttThread):
     self.publish_status({'armed': 0})
 
 
-def api_request(url, method='GET', params=None, data=None, auth=None, headers=None, verify_ssl=False):
-  try:
-    req = requests.request(method, url, params=params,
-            data=data, headers=headers, auth=auth, verify=verify_ssl, timeout=2)
-    req.raise_for_status()
-  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
-    LOG.error('Fail to connect to url %s', e)
-    return {}
-  try:
-    data = json.loads(req.text)
-  except (ValueError) as e:
-    return {}
-
-  LOG.debug("Got response from geofencing API '%s'", data)
-  return data
-
-
 LOG = logging.getLogger(__name__)
 
 
@@ -86,9 +73,6 @@ def main():
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
-
-  logging.getLogger("requests").setLevel(logging.CRITICAL)
-  requests.packages.urllib3.disable_warnings()
 
   fence = FenceThread(conf=conf)
   fence.start()

@@ -1,14 +1,11 @@
 import logging
-import requests
 import sys
 
+from moteino_sensors import utils
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
 
-
-logging.getLogger("requests").setLevel(logging.CRITICAL)
-requests.packages.urllib3.disable_warnings()
 
 def send_bulksms(data, action_config):
   """Send SMS via www.bulksms.com
@@ -37,16 +34,12 @@ def send_bulksms(data, action_config):
       'message': data['message'],
   }
 
-  try:
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
-    LOG.warning("Got exception '%s' in send_bulksms", e)
-    sys.exit(2)
+  req = utils.http_request(url, params=params)
 
-  result = r.text.split('|')
-  if result[0] != '0':
-    LOG.warning("Fail in send_bulksms '%s' '%s'", result[0], result[1])
-    sys.exit(2)
+  if req:
+    result = req.text.split('|')
+    if result[0] == '0':
+      sys.exit(0)
 
-  sys.exit(0)
+  LOG.warning('Fail to send SMS via bulksms.com')
+  sys.exit(2)

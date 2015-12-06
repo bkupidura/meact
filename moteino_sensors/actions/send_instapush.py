@@ -1,15 +1,13 @@
 import json
 import logging
-import requests
 import sys
+
+from moteino_sensors import utils
 
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
 
-
-logging.getLogger("requests").setLevel(logging.CRITICAL)
-requests.packages.urllib3.disable_warnings()
 
 def send_instapush(data, action_config):
   """Send notification via instapush.im
@@ -50,11 +48,11 @@ def send_instapush(data, action_config):
       'x-instapush-appid': app['id'],
       'x-instapush-appsecret': app['secret']
     }
-    try:
-      r = requests.post(url, data=json.dumps(params), headers=headers)
-      r.raise_for_status()
-    except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
-      LOG.warning("Got exception '%s' in send_instapush", e)
+
+    req = utils.http_request(url, method='POST', data=json.dumps(params), headers=headers)
+
+    if not req:
+      LOG.warning('Fail to send notification via instapush.im')
       sys.exit(2)
 
   sys.exit(0)

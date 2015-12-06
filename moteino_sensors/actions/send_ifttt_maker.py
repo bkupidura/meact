@@ -1,14 +1,11 @@
 import logging
-import requests
 import sys
 
+from moteino_sensors import utils
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
 
-
-logging.getLogger("requests").setLevel(logging.CRITICAL)
-requests.packages.urllib3.disable_warnings()
 
 def send_ifttt_maker(data, action_config):
   """Send request to IFTTT Maker channel
@@ -38,11 +35,9 @@ def send_ifttt_maker(data, action_config):
       'value3': data['board_id']
   }
 
-  try:
-    r = requests.put(url, params=params)
-    r.raise_for_status()
-  except (requests.HTTPError, requests.ConnectionError, requests.exceptions.Timeout) as e:
-    LOG.warning("Got exception '%s' in send_ifttt_maker", e)
-    sys.exit(2)
+  req = utils.http_request(url, method='PUT', params=params)
+  if req:
+    sys.exit(0)
 
-  sys.exit(0)
+  LOG.warning('Fail to send IFTTT maker requests')
+  sys.exit(2)
