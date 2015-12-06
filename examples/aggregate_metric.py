@@ -74,6 +74,8 @@ def aggregate_metrics(db, start, end, sensor_type, execute):
 
 # Map policy name to seconds
 policy_map = {
+  '10m': 60*10,
+  '30m': 60*30,
   'hour': 60*60,
   'day': 60*60*24,
   'week': 60*60*24*7,
@@ -85,7 +87,7 @@ def main():
   parser.add_argument('--start', required=True, help='Start time for aggregate (seconds since epoch)')
   parser.add_argument('--end', required=True, help='End time for aggregate (seconds since epoch)')
   parser.add_argument('--db-string', required=True, help='Connection string for DB. Ex. sqlite:////etc/mgw/mgw.db')
-  parser.add_argument('--policy', required=True, help='Aggregate policy, aggregate per hour/day/week/month')
+  parser.add_argument('--policy', required=True, help='Aggregate policy, aggregate per 10m/30m/hour/day/week/month')
   parser.add_argument('--sensor-type', required=False, help='sensor_type for aggregate, if missing we will aggregate all sensor_type')
   parser.add_argument('--execute', required=False, help='Execute data aggregation, without this DB will not be changed', action="store_true")
   args = parser.parse_args()
