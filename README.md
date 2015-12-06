@@ -299,6 +299,8 @@ API endpoints:
 Send data to MQTT via API:
 > curl localhost:8080/api/action/mqtt -H "Content-Type: application/json" --data '{"data":{"asd": 10, "bsd": 20}, "topic":"xyz"}'
 
+Screens can be found at [Dashboard screens](https://github.com/bkupidura/mgw/tree/master/docs/img/dashboard)
+
 ### Aggregate metric
 In example dir you can find python script which can be used to aggregate data in DB.
 
