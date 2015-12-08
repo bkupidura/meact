@@ -286,7 +286,8 @@ Update status:
 ### Moteino-API
 API delivers static dashboard and way to communicate over MQTT.
 
-All customization can be done inside api/static/mappings.js.
+To override static files (ex. api/static/mappings.js, api/static/map.svg) copy those files into conf['user_static_dir'].
+API firstly look for static files in conf['user_static_dir'] if file is missing it will be served from conf['static_dir'].
 
 API endpoints:
 * GET /api/action/status - get current MQTT status
@@ -300,6 +301,16 @@ Send data to MQTT via API:
 > curl localhost:8080/api/action/mqtt -H "Content-Type: application/json" --data '{"data":{"asd": 10, "bsd": 20}, "topic":"xyz"}'
 
 Screens can be found at [Dashboard screens](https://github.com/bkupidura/mgw/tree/master/docs/img/dashboard)
+
+#### map.svg
+File used to visualize location of boards on SVG image. 
+This image can be plan of yours home.
+
+To create SVG image you can use any [svg editor](http://svg-edit.googlecode.com/svn-history/r1771/trunk/editor/svg-editor.html)
+
+Example svg can be found in api/static/map.svg.example
+
+Dashboard maps boards to SVG elements by SVG 'id' tag. Tag should be in format 'board-BOARD_ID'.
 
 ### Aggregate metric
 In example dir you can find python script which can be used to aggregate data in DB.
