@@ -135,6 +135,7 @@
                 } else if (href == '#map'){
                     $.getJSON(api_endpoint + '/node').done(function(data){
                         var svg_map = document.getElementById("svg-map").contentDocument;
+                        d3.selectAll(".d3-tip").remove();
                         for (var k in data){
                             var svg_board = d3.select(svg_map).select("#board-" + data[k]['name']);
                             var tip = d3.tip()
