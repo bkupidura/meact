@@ -35,7 +35,11 @@ def redirect2index():
 
 @app.route('/front/<filepath:path>')
 def static(filepath):
-  return bottle.static_file(filepath, root=app.config['appconfig']['static_dir'])
+  static_content = bottle.static_file(filepath, root=app.config['appconfig']['user_static_dir'])
+  if static_content._status_code == 404:
+    static_content = bottle.static_file(filepath, root=app.config['appconfig']['static_dir'])
+
+  return static_content
 
 
 @app.route('/api/action/status')
