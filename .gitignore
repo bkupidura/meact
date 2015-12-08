@@ -3,6 +3,7 @@ mgw.db
 boards.config.json
 sensors.config.json
 **/global.config.json
+map.svg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

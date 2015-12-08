@@ -16,3 +16,9 @@ status_mapping = {
     'Service': ['msd', 'mgw', 'srl', 'fence'],
     'Status': ['armed']
 }
+/* Allow to disable any element from dashboard based on ID
+ * If you want to disable ex. graph tab and map tab
+ * disabled_elems = ['graph-tab', 'map-tab']
+ *
+ */
+disabled_elems = []

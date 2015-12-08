@@ -7,6 +7,8 @@
         <script src="sprintf.js"></script>
         <script src="utils.js"></script>
         <script src="mappings.js"></script>
+        <script src="d3.v3.min.js" charset="utf-8"></script>
+        <script src="d3-tip.js"></script>
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="dist/css/bootstrap.min.css">
 
@@ -29,9 +31,10 @@
         <div class="starter-template">
             <ul id="mainTabs" class="nav nav-tabs">
                 <li role="presentation"><a href="#status" id="status-tab" data-toggle="tab">Status</a></li>
-                <li role="presentation"><a href="#node" data-toggle="tab">Node</a></li>
+                <li role="presentation"><a href="#node" id="node-tab" data-toggle="tab">Node</a></li>
+                <li role="presentation"><a href="#map" id="map-tab" data-toggle="tab">Map</a></li>
                 <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown">Graph<span class="caret"></span></a>
+                <a href="#" class="dropdown-toggle" id="graph-tab" data-toggle="dropdown">Graph<span class="caret"></span></a>
                     <ul class="dropdown-menu" id="dropdown-menu" role="menu">
                     </ul>
                 </li>
@@ -39,6 +42,9 @@
             <div class="tab-content">
                 <div class="tab-pane fade" id="status"></div>
                 <div class="tab-pane fade" id="node"></div>
+                <div class="tab-pane fade" id="map">
+                    <object type="image/svg+xml" data="map.svg" id="svg-map"></object>
+                </div>
                 <div class="tab-pane fade" id="graph"></div>
             </div>
         </div>
@@ -59,6 +65,11 @@
             li.appendChild(href);
 
             menu.appendChild(li);
+        }
+
+        for (var key in disabled_elems){
+            var elem = document.getElementById(disabled_elems[key]);
+            $(elem).hide();
         }
 
         Highcharts.setOptions({
@@ -117,6 +128,32 @@
 
                         $(href).html(node_html);
                     });
+                } else if (href == '#map'){
+                    $.getJSON(api_endpoint + '/node').done(function(data){
+                        var svg_map = document.getElementById("svg-map").contentDocument;
+                        for (var k in data){
+                            var svg_board = d3.select(svg_map).select("#board-" + data[k]['name']);
+                            var tip = d3.tip()
+                                .attr('class', 'd3-tip')
+                                .offset([120, 15])
+                                .direction('n')
+
+                            if (data[k]['data'].length){
+                                svg_board.attr("fill", "#008000");
+                                var source = $('#mapOnlineTemplate').html();
+                                var template = Handlebars.compile(source);
+                            } else {
+                                var source = $('#mapOfflineTemplate').html();
+                                var template = Handlebars.compile(source);
+                                svg_board.attr("fill", "#FF0000");
+                            }
+
+                            tip.html(template(data[k]));
+                            svg_board.call(tip);
+                            svg_board.on('mouseover', tip.show);
+                            svg_board.on('mouseout', tip.hide);
+                        }
+                    });
                 } else if (href == '#graph'){
                     var graph_type = $(ev.target).text().toLowerCase();
                     function callback(data){
@@ -127,6 +164,16 @@
                 }
             });
         });
+    </script>
+    <script id="mapOnlineTemplate" type="x-handlebars-template">
+        Board: {{name}}<br />
+        {{#data}}
+            {{0}}: {{1}}<br />
+        {{/data}}
+    </script>
+    <script id="mapOfflineTemplate" type="x-handlebars-template">
+        Board: {{name}}<br />
+        Offline
     </script>
     <script id="nodeOnlineTemplate" type="x-handlebars-template">
         <h3>Online nodes</h3>

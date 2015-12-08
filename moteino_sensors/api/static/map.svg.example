@@ -1,0 +1,20 @@
+<svg width="640" height="480" xmlns="http://www.w3.org/2000/svg">
+ <!-- Created with SVG-edit - http://svg-edit.googlecode.com/ -->
+ <g>
+  <rect fill="#bfbfbf" stroke="#000000" stroke-width="5" x="75" y="151" width="94" height="163" id="svg_1"/>
+  <rect fill="#bfbfbf" stroke="#000000" stroke-width="5" x="170" y="253.5" width="94" height="60" id="svg_2"/>
+  <rect fill="#bfbfbf" stroke="#000000" stroke-width="5" x="170" y="151" width="94" height="60" id="svg_3"/>
+  <rect fill="#bfbfbf" stroke="#000000" stroke-width="5" x="75" y="314" width="188.99999" height="83" id="svg_4"/>
+  <text fill="#000000" stroke="#000000" stroke-width="0" stroke-linejoin="null" stroke-linecap="null" x="168" y="359" id="svg_6" font-size="15" font-family="serif" text-anchor="middle" xml:space="preserve">Living room</text>
+  <text fill="#000000" stroke="#000000" stroke-width="0" stroke-linejoin="null" stroke-linecap="null" x="213.01563" y="286.5" font-size="15" font-family="serif" text-anchor="middle" xml:space="preserve" id="svg_8">Kitchen</text>
+  <text fill="#000000" stroke="#000000" stroke-width="0" stroke-linejoin="null" stroke-linecap="null" x="215.01563" y="184.5" font-size="15" font-family="serif" text-anchor="middle" xml:space="preserve" id="svg_9">Bedroom</text>
+  <text fill="#000000" stroke="#000000" stroke-width="0" stroke-linejoin="null" stroke-linecap="null" x="124.01563" y="232.5" font-size="15" font-family="serif" text-anchor="middle" xml:space="preserve" id="svg_10">Hallway</text>
+  <circle id="board-1" r="9.82766" cy="183" cx="264" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-2" r="9.82766" cy="284.00001" cx="264" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-4" r="9.82766" cy="397.00001" cx="96" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-3" r="9.82766" cy="397" cx="126" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-6" r="9.82766" cy="152" cx="118" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-5" r="9.82766" cy="301.00001" cx="87" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+  <circle id="board-7" r="9.82766" cy="263.00001" cx="191" stroke-width="5" stroke="#000000" fill="#ffffff"/>
+ </g>
+</svg>
