@@ -312,6 +312,17 @@ Example svg can be found in api/static/map.svg.example
 
 Dashboard maps boards to SVG elements by SVG 'id' tag. Tag should be in format 'board-BOARD_ID'.
 
+#### mappings.js
+Allows to customize dashboard.
+
+commands_mapping - provide list of available commands for boards
+
+graphs_mapping - provide list of available graphs
+
+status_mapping - provide mapping for 'status'
+
+disabled_elems - list of html elements by ID which should be hidden
+
 ### Aggregate metric
 In example dir you can find python script which can be used to aggregate data in DB.
 
