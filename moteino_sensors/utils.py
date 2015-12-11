@@ -10,6 +10,7 @@ from cerberus import Validator, cerberus
 
 from moteino_sensors import actions
 
+LOG = logging.getLogger(__name__)
 logging.getLogger("requests").setLevel(logging.CRITICAL)
 requests.packages.urllib3.disable_warnings()
 

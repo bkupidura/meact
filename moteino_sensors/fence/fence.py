@@ -23,9 +23,10 @@ class FenceThread(mqtt.MqttThread):
     while True:
       self.enabled.wait()
       req = utils.http_request(self.conf['geo_api'], auth=(self.conf['geo_user'], self.conf['geo_pass']))
+
       try:
         data = json.loads(req.text)
-      except (ValueError, TypeError) as e:
+      except (ValueError, TypeError, AttributeError) as e:
         data = None
 
       if data:
@@ -48,17 +49,20 @@ class FenceThread(mqtt.MqttThread):
           status['exit'] += 1
 
     armed = self.status.get('armed')
+
+    LOG.debug("API data '%s', status '%s', armed %s", data, status, armed)
+
     if (armed == 1) and (status['enter'] > 0):
-      LOG.info('Disarm alarm')
       self._unset_armed()
     elif (armed == 0) and (status['exit'] == len(self.conf['geo_devices'])):
-      LOG.info('Arm alarm')
       self._set_armed()
 
   def _set_armed(self):
+    LOG.info('Arm alarm')
     self.publish_status({'armed': 1})
 
   def _unset_armed(self):
+    LOG.info('Disarm alarm')
     self.publish_status({'armed': 0})
 
 
