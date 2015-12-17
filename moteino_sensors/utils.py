@@ -47,7 +47,7 @@ def validate_sensor_data(data):
   return v.validate(data, schema)
 
 
-def validate_action_details(data):
+def validate_sensor_config(data):
   schema = {'action_interval': {'required': True, 'type': 'integer', 'min': 0},
             'check_if_armed': {'required': True, 'type': 'dict', 'schema': {
                 'default': {'required': True, 'anyof':

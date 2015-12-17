@@ -128,6 +128,7 @@ def get_graph(graph_type=None):
 class SyncThread(mqtt.MqttThread):
   def __init__(self, conf):
     super(SyncThread, self).__init__()
+    self.name = 'api'
     self.app_config = conf
     self.daemon = True
     self.mqtt_config = conf['mqtt']

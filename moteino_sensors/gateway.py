@@ -13,14 +13,14 @@ from moteino_sensors import mqtt
 from moteino_sensors import utils
 
 
-class ActionDetailsAdapter(dict):
+class SensorConfigAdapter(dict):
   """Adapter for action details
 
   Provides helpers and functions that allows
   to easily work on action details
   """
   def build_defaults(self, index):
-    self.setdefault('check_if_armed', {'default': True})
+    self.setdefault('check_if_armed', {'default': False})
     self.setdefault('action_interval', 0)
     self.setdefault('threshold', 'lambda x: True')
     self.setdefault('fail_count', 0)
@@ -136,7 +136,7 @@ class MgwThread(mqtt.MqttThread):
 
   def _prepare_data(self, sensor_data):
     sensor_data = self._prepare_sensor_data(sensor_data)
-    sensor_config = self._prepare_action_details(sensor_data)
+    sensor_config = self._prepare_sensor_config(sensor_data)
 
     return sensor_data, sensor_config
 
@@ -150,37 +150,37 @@ class MgwThread(mqtt.MqttThread):
 
     return sensor_data
 
-  def _prepare_action_details(self, sensor_data):
+  def _prepare_sensor_config(self, sensor_data):
     if not sensor_data:
       return None
 
     sensor_type = sensor_data.get('sensor_type')
-    actions_details = self.sensors_map.get(sensor_type)
+    sensor_configs = self.sensors_map.get(sensor_type)
 
-    if not actions_details or 'actions' not in actions_details:
+    if not sensor_configs or 'actions' not in sensor_configs:
       LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
       return None
 
-    for index, action_details in enumerate(actions_details['actions']):
+    for index, sensor_config in enumerate(sensor_configs['actions']):
 
-      action_details = ActionDetailsAdapter(action_details)
-      action_details.build_defaults(index)
+      sensor_config = SensorConfigAdapter(sensor_config)
+      sensor_config.build_defaults(index)
 
-      if not utils.validate_action_details(action_details):
-        LOG.warning("Fail to validate data '%s', ignoring..", action_details)
+      if not utils.validate_sensor_config(sensor_config):
+        LOG.warning("Fail to validate data '%s', ignoring..", sensor_config)
         return None
       else:
-        actions_details['actions'][index] = action_details
+        sensor_configs['actions'][index] = sensor_config
 
-    return actions_details
+    return sensor_configs
 
-  def _action_execute(self, data, actions, action_config):
+  def _action_execute(self, sensor_data, actions, action_config):
     result = 0
 
-    for a in actions:
-      LOG.debug("Action execute '%s'", a)
+    for action in actions:
+      LOG.debug("Action execute '%s'", action)
 
-      action_name = a['name']
+      action_name = action['name']
       action_func = ACTIONS_MAPPING.get(action_name)
       conf = action_config.get(action_name)
 
@@ -188,7 +188,7 @@ class MgwThread(mqtt.MqttThread):
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      p = Process(target=action_func.get('func'), args=(data, conf))
+      p = Process(target=action_func.get('func'), args=(sensor_data, conf))
       p.start()
       p.join(action_func.get('timeout'))
       if p.is_alive():
@@ -199,56 +199,56 @@ class MgwThread(mqtt.MqttThread):
 
       if status:
         LOG.error("Fail to execute action '%s', exitcode '%d'", action_name, status)
-        failback_actions = a.get('failback')
+        failback_actions = action.get('failback')
         if failback_actions:
           LOG.debug("Failback '%s'", failback_actions)
-          result += self._action_execute(data, failback_actions, action_config)
+          result += self._action_execute(sensor_data, failback_actions, action_config)
       else:
         result += 1
 
     return result
 
-  def _action_helper(self, data, actions_details, action_config=None):
+  def _action_helper(self, sensor_data, sensor_configs, action_config=None):
 
-    LOG.debug("Action helper '%s' '%s'", data, actions_details['actions'])
-    for action_details in actions_details['actions']:
+    LOG.debug("Action helper '%s' '%s'", sensor_data, sensor_configs['actions'])
+    for sensor_config in sensor_configs['actions']:
 
-      self.action_status.build_defaults(data['board_id'],
-              action_details['index'],
-              data['sensor_type'])
-      self.action_status.clean_failed(data['board_id'],
-              action_details['index'],
-              data['sensor_type'],
-              action_details['fail_interval'])
+      self.action_status.build_defaults(sensor_data['board_id'],
+              sensor_config['index'],
+              sensor_data['sensor_type'])
+      self.action_status.clean_failed(sensor_data['board_id'],
+              sensor_config['index'],
+              sensor_data['sensor_type'],
+              sensor_config['fail_interval'])
 
-      if not eval(action_details['threshold'])(data['sensor_data']):
+      if not eval(sensor_config['threshold'])(sensor_data['sensor_data']):
         continue
 
       try:
-        data['message'] = action_details['message_template'].format(**data)
+        sensor_data['message'] = sensor_config['message_template'].format(**sensor_data)
       except (KeyError) as e:
-        LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", action_details['message_template'], data, e)
+        LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", sensor_config['message_template'], sensor_data, e)
         continue
 
-      if action_details.should_check_if_armed(data['board_id']) and not self.status.get('armed'):
+      if sensor_config.should_check_if_armed(sensor_data['board_id']) and not self.status.get('armed'):
         continue
 
-      if not self.action_status.check_failed_count(data['board_id'],
-              action_details['index'],
-              data['sensor_type'],
-              action_details['fail_count']):
+      if not self.action_status.check_failed_count(sensor_data['board_id'],
+              sensor_config['index'],
+              sensor_data['sensor_type'],
+              sensor_config['fail_count']):
         continue
 
-      if not self.action_status.check_last_action(data['board_id'],
-              action_details['index'],
-              data['sensor_type'],
-              action_details['action_interval']):
+      if not self.action_status.check_last_action(sensor_data['board_id'],
+              sensor_config['index'],
+              sensor_data['sensor_type'],
+              sensor_config['action_interval']):
         continue
 
-      if self._action_execute(data,
-              action_details['action'],
+      if self._action_execute(sensor_data,
+              sensor_config['action'],
               action_config):
-        self.action_status.update_last_action(data['board_id'], action_details['index'], data['sensor_type'])
+        self.action_status.update_last_action(sensor_data['board_id'], sensor_config['index'], sensor_data['sensor_type'])
 
   def run(self):
     LOG.info('Starting')
