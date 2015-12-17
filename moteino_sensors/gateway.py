@@ -27,6 +27,7 @@ class SensorConfigAdapter(dict):
     self.setdefault('fail_interval', 600)
     self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
     self.setdefault('action_config', {})
+    self.setdefault('board_ids', [])
 
     self['check_if_armed'].setdefault('except', [])
     self['index'] = index
@@ -38,6 +39,13 @@ class SensorConfigAdapter(dict):
       ^
       (board_id in self['check_if_armed']['except'])
     )
+
+  def config_for_board(self, board_id):
+    if self['board_ids'] and board_id in self['board_ids']:
+      return True
+    elif not self['board_ids']:
+      return True
+    return False
 
 
 class ActionStatusAdapter(dict):
@@ -225,6 +233,9 @@ class MgwThread(mqtt.MqttThread):
               sensor_config['index'],
               sensor_data['sensor_type'],
               sensor_config['fail_interval'])
+
+      if not sensor_config.config_for_board(sensor_data['board_id']):
+        continue
 
       if not eval(sensor_config['threshold'])(sensor_data['sensor_data']):
         continue

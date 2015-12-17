@@ -94,6 +94,7 @@
             {"id": "instapush-app-id", "secret": "instapush-app-secret"}
             ]
           }
+        }
       },
       {
       "action": [{"name": "send_instapush", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
@@ -110,6 +111,25 @@
             {"id": "instapush-app-id2", "secret": "instapush-app-secret2"}
             ]
           }
+        }
+      }
+    ]
+  }
+  "switch": {
+    "actions": [
+      {
+      "action": [{"name": "log"}],
+      "message_template": "Switch pressed on board 10",
+      "board_ids": ["10"]
+      },
+      {
+      "action": [{"name": "log"}],
+      "message_template": "Switch pressed on board 11",
+      "board_ids": ["11"]
+      },
+      {
+      "action": [{"name": "log"}],
+      "message_template": "Switch pressed"
       }
     ]
   }
