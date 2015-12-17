@@ -63,5 +63,28 @@
       "message_template": "Board {board_desc} ({board_id}) is missing for {sensor_data} seconds"
       }
     ]
+  },
+  "status_armed": {
+    "priority": 10,
+    "actions": [
+      {
+      "action": [{"name": "send_instapush", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+      "check_if_armed": {"default": 0},
+      "action_interval": 1,
+      "threshold": "lambda x: int(x)==1",
+      "fail_count": 0,
+      "fail_interval": 0,
+      "message_template": "Alarm armed"
+      },
+      {
+      "action": [{"name": "send_instapush", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+      "check_if_armed": {"default": 0},
+      "action_interval": 1,
+      "threshold": "lambda x: int(x)==0",
+      "fail_count": 0,
+      "fail_interval": 0,
+      "message_template": "Alarm disarmed"
+      }
+    ]
   }
 }

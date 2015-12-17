@@ -210,8 +210,8 @@ class MgwThread(mqtt.MqttThread):
 
   def _action_helper(self, data, actions_details, action_config=None):
 
+    LOG.debug("Action helper '%s' '%s'", data, actions_details['actions'])
     for action_details in actions_details['actions']:
-      LOG.debug("Action helper '%s' '%s'", data, action_details)
 
       self.action_status.build_defaults(data['board_id'],
               action_details['index'],

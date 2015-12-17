@@ -78,12 +78,31 @@ class MqttThread(threading.Thread):
     self.mqtt.loop_start()
     self.mqtt._thread.setName(self.name+'-mqtt')
 
+  def _create_sensor_data(self, sensor_type, sensor_data, board_id=None):
+    if board_id is None or not isinstance(board_id, str):
+      board_id = self.name
+
+    sensor_data = {
+      'sensor_type': sensor_type,
+      'sensor_data': str(sensor_data),
+      'board_id': board_id
+    }
+
+    return sensor_data
+
   def publish_status(self, status=None):
     topic = self.mqtt_config.get('topic', {})
     if hasattr(self, 'status') and 'mgmt' in topic:
       if status:
         self.status.update(status)
-      self.publish(topic['mgmt']+'/status', self.status, retain=True)
+      self.publish(topic['mgmt'] + '/status', self.status, retain=True)
+
+    if hasattr(self, 'status') and 'mgw' in topic:
+      if not status:
+        status = self.status
+      for key in status:
+        sensor_data = self._create_sensor_data('status_' + key, status[key])
+        self.publish(topic['mgw'] + '/action', sensor_data)
 
   def subscribe(self, topic):
     if isinstance(topic, str) or isinstance(topic, unicode):
