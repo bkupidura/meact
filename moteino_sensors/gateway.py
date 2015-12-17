@@ -177,6 +177,7 @@ class MgwThread(mqtt.MqttThread):
   def _action_execute(self, sensor_data, actions, action_config):
     result = 0
 
+    LOG.info("Action execute for data '%s'", sensor_data)
     for action in actions:
       LOG.debug("Action execute '%s'", action)
 
