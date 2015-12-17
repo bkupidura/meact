@@ -7,7 +7,6 @@
       "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
       "user": "user",
       "password": "password",
-      "recipient": ["+48000000000"],
       "enabled": 0
     },
     "send_mail": {
@@ -29,9 +28,6 @@
     "send_instapush": {
       "endpoint": "https://api.instapush.im/v1/post",
       "event": "notification",
-      "apps": [
-        {"id": "instapush-app-id", "secret": "instapush-app-secret"}
-      ],
       "enabled": 0
     },
     "send_ifttt_maker": {

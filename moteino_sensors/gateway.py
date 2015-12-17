@@ -26,6 +26,7 @@ class SensorConfigAdapter(dict):
     self.setdefault('fail_count', 0)
     self.setdefault('fail_interval', 600)
     self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+    self.setdefault('action_config', {})
 
     self['check_if_armed'].setdefault('except', [])
     self['index'] = index
@@ -174,7 +175,7 @@ class MgwThread(mqtt.MqttThread):
 
     return sensor_configs
 
-  def _action_execute(self, sensor_data, actions, action_config):
+  def _action_execute(self, sensor_data, actions, global_action_config, sensor_action_config):
     result = 0
 
     LOG.info("Action execute for data '%s'", sensor_data)
@@ -183,13 +184,16 @@ class MgwThread(mqtt.MqttThread):
 
       action_name = action['name']
       action_func = ACTIONS_MAPPING.get(action_name)
-      conf = action_config.get(action_name)
+
+      action_config = global_action_config.get(action_name, {})
+      sensor_config = sensor_action_config.get(action_name, {})
+      action_config.update(sensor_config)
 
       if not action_func:
         LOG.warning('Unknown action %s', action_name)
         continue
 
-      p = Process(target=action_func.get('func'), args=(sensor_data, conf))
+      p = Process(target=action_func.get('func'), args=(sensor_data, action_config))
       p.start()
       p.join(action_func.get('timeout'))
       if p.is_alive():
@@ -203,7 +207,7 @@ class MgwThread(mqtt.MqttThread):
         failback_actions = action.get('failback')
         if failback_actions:
           LOG.debug("Failback '%s'", failback_actions)
-          result += self._action_execute(sensor_data, failback_actions, action_config)
+          result += self._action_execute(sensor_data, failback_actions, global_action_config, sensor_action_config)
       else:
         result += 1
 
@@ -248,7 +252,8 @@ class MgwThread(mqtt.MqttThread):
 
       if self._action_execute(sensor_data,
               sensor_config['action'],
-              action_config):
+              action_config,
+              sensor_config['action_config']):
         self.action_status.update_last_action(sensor_data['board_id'], sensor_config['index'], sensor_data['sensor_type'])
 
   def run(self):

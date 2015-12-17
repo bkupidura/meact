@@ -62,7 +62,8 @@ def validate_sensor_config(data):
             'fail_count': {'required': True, 'type': 'integer', 'min': 0},
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
             'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'index': {'required': True, 'type': 'integer', 'min': 0}
+            'index': {'required': True, 'type': 'integer', 'min': 0},
+            'action_config': {'required': True, 'type': 'dict'}
             }
   v = ActionValidator()
   return v.validate(data, schema)
