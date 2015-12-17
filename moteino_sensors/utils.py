@@ -63,7 +63,8 @@ def validate_sensor_config(data):
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
             'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
             'index': {'required': True, 'type': 'integer', 'min': 0},
-            'action_config': {'required': True, 'type': 'dict'},
+            'action_config': {'required': True, 'type': 'dict', 'valueschema':
+                {'type': 'dict'}},
             'board_ids': {'required': True, 'type': 'list', 'schema':
                 {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}
             }

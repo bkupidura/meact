@@ -157,18 +157,22 @@ def test_board_ids(board_ids, expected):
 
   assert ada == expected
 
-dict_test_data = (
+dict_of_dict_test_data = (
   (
     {},
     True
   ),
   (
-    {'1': 10},
+    {'1': {'1': 'asd'}},
     True
   ),
   (
-    {'1': {'1': 'asd'}},
-    True
+    {'1': 10},
+    False
+  ),
+  (
+    {'1': {'1': 'asd'}, '2': []},
+    False
   ),
   (
     [],
@@ -184,7 +188,7 @@ dict_test_data = (
   ),
 )
 
-@pytest.mark.parametrize('action_config, expected', dict_test_data)
+@pytest.mark.parametrize('action_config, expected', dict_of_dict_test_data)
 def test_action_config(action_config, expected):
   sensor_config = copy.deepcopy(default_action)
   sensor_config['action_config'] = action_config
