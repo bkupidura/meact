@@ -1,7 +1,7 @@
+from threading import _Event
 import json
 import logging
 import socket
-import threading
 import time
 
 import paho.mqtt.client as paho
@@ -11,15 +11,15 @@ from moteino_sensors import utils
 LOG = logging.getLogger(__name__)
 
 
-class MqttThread(threading.Thread):
+class Mqtt(object):
 
   def __init__(self):
-    super(MqttThread, self).__init__()
+    super(Mqtt, self).__init__()
 
   def _on_mgmt_status(self, client, userdata, msg):
     self.status = utils.load_json(msg.payload)
     if self.name in self.status and hasattr(self, 'enabled'):
-      if isinstance(self.enabled, threading._Event):
+      if isinstance(self.enabled, _Event):
         self.enabled.set() if self.status[self.name] else self.enabled.clear()
       else:
         self.enabled = self.status[self.name]

@@ -81,7 +81,7 @@ def create_logger(conf=None):
 
   logger = logging.getLogger()
   logger.setLevel(level)
-  formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+  formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
   if log_file:
     handler = logging.FileHandler(log_file)

@@ -125,18 +125,12 @@ def get_graph(graph_type=None):
   return json.dumps(output)
 
 
-class SyncThread(mqtt.MqttThread):
+class Api(mqtt.Mqtt):
   def __init__(self, conf):
-    super(SyncThread, self).__init__()
+    super(Api, self).__init__()
     self.name = 'api'
-    self.app_config = conf
-    self.daemon = True
     self.mqtt_config = conf['mqtt']
     self.start_mqtt()
-
-  def run(self):
-    while True:
-      self.mqtt.loop()
 
 
 def main():
@@ -152,8 +146,8 @@ def main():
 
   app.config['appconfig'] = api_config
 
-  app.config['mqtt'] = SyncThread(app.config['appconfig'])
-  app.config['mqtt'].start()
+  app.config['mqtt'] = Api(app.config['appconfig'])
+  app.config['mqtt'].loop_start()
 
   app.config['db'] = database.connect(app.config['appconfig']['db_string'])
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
+from threading import Event
 import logging
 import re
-import threading
 import time
 
 import serial
@@ -9,15 +9,15 @@ import serial
 from moteino_sensors import mqtt
 from moteino_sensors import utils
 
-class SrlThread(mqtt.MqttThread):
+class Srl(mqtt.Mqtt):
   # [ID][metric:value] / [10][voltage:3.3]
   _re_sensor_data = re.compile(
     '\[(?P<board_id>.+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
 
   def __init__(self, serial, mqtt_config):
-    super(SrlThread, self).__init__()
+    super(Srl, self).__init__()
     self.name = 'srl'
-    self.enabled = threading.Event()
+    self.enabled = Event()
     self.enabled.set()
     self.serial = serial
     self.mqtt_config = mqtt_config
@@ -89,11 +89,11 @@ def main():
     conf['serial']['speed'],
     timeout=conf['serial']['timeout']
   )
-  srl = SrlThread(
+  srl = Srl(
     serial=ser,
     mqtt_config=conf['mqtt'])
 
-  srl.start()
+  srl.run()
 
 
 if __name__ == "__main__":

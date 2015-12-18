@@ -1,17 +1,17 @@
 #!/usr/bin/env python
+from threading import Event
 import json
 import logging
-import threading
 import time
 
 from moteino_sensors import mqtt
 from moteino_sensors import utils
 
-class FenceThread(mqtt.MqttThread):
+class Fence(mqtt.Mqtt):
   def __init__(self, conf):
-    super(FenceThread, self).__init__()
+    super(Fence, self).__init__()
     self.name = 'fence'
-    self.enabled = threading.Event()
+    self.enabled = Event()
     self.enabled.set()
     self.conf = conf
     self.mqtt_config = conf['mqtt']
@@ -78,8 +78,8 @@ def main():
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  fence = FenceThread(conf=conf)
-  fence.start()
+  fence = Fence(conf=conf)
+  fence.run()
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 from multiprocessing import Process
+from threading import Event
 import Queue
 import logging
 import random
 import sqlite3
 import sys
-import threading
 import time
 
 from moteino_sensors import database
@@ -84,7 +84,7 @@ class ActionStatusAdapter(dict):
     self[board_id][index][sensor_type]['last_action'] = now
 
 
-class MgwThread(mqtt.MqttThread):
+class Mgw(mqtt.Mqtt):
   status = {
     'mgw': 1,
     'msd': 1,
@@ -94,9 +94,9 @@ class MgwThread(mqtt.MqttThread):
   }
 
   def __init__(self, db_string, boards_map, sensors_map, action_config, mqtt_config):
-    super(MgwThread, self).__init__()
+    super(Mgw, self).__init__()
     self.name = 'mgw'
-    self.enabled = threading.Event()
+    self.enabled = Event()
     self.enabled.set()
     self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
@@ -311,14 +311,14 @@ def main():
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  mgw = MgwThread(
+  mgw = Mgw(
     db_string=conf['db_string'],
     boards_map=boards_map,
     sensors_map=sensors_map,
     action_config=conf['action_config'],
     mqtt_config=conf['mqtt'])
 
-  mgw.start()
+  mgw.run()
 
 
 if __name__ == "__main__":
