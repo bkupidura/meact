@@ -118,9 +118,14 @@
   "switch": {
     "actions": [
       {
-      "action": [{"name": "log"}],
+      "action": [{"name": "send_mqtt"}],
       "message_template": "Switch pressed on board 10",
-      "board_ids": ["10"]
+      "board_ids": ["10"],
+      "action_config": {
+        "send_mqtt": {
+          "message": ["{board_id}:255"]
+          }
+        }
       },
       {
       "action": [{"name": "log"}],
