@@ -258,8 +258,8 @@ class Mgw(mqtt.Mqtt):
 
       try:
         sensor_data['message'] = sensor_config['message_template'].format(**sensor_data)
-      except (KeyError) as e:
-        LOG.error("Fail to format message '%s' with data '%s' missing key '%s'", sensor_config['message_template'], sensor_data, e)
+      except (KeyError, ValueError) as e:
+        LOG.error("Fail to format message '%s' with data '%s'", sensor_config['message_template'], sensor_data)
         continue
 
       if sensor_config.should_check_if_armed(sensor_data['board_id']) and not self.status.get('armed'):
