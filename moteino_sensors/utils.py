@@ -62,7 +62,7 @@ def validate_sensor_config(data):
             'fail_count': {'required': True, 'type': 'integer', 'min': 0},
             'message_template': {'required': True, 'empty': False, 'type': 'string'},
             'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'index': {'required': True, 'type': 'integer', 'min': 0},
+            'id': {'required': True, 'type': 'string', 'empty': False},
             'action_config': {'required': True, 'type': 'dict', 'valueschema':
                 {'type': 'dict'}},
             'board_ids': {'required': True, 'type': 'list', 'schema':

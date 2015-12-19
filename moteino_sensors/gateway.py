@@ -2,6 +2,8 @@
 from multiprocessing import Process
 from threading import Event
 import Queue
+import hashlib
+import json
 import logging
 import random
 import sqlite3
@@ -19,7 +21,7 @@ class SensorConfigAdapter(dict):
   Provides helpers and functions that allows
   to easily work on sensor config
   """
-  def build_defaults(self, index):
+  def build_defaults(self):
     self.setdefault('check_if_armed', {'default': False})
     self.setdefault('action_interval', 0)
     self.setdefault('threshold', 'lambda x: True')
@@ -30,7 +32,9 @@ class SensorConfigAdapter(dict):
     self.setdefault('board_ids', [])
 
     self['check_if_armed'].setdefault('except', [])
-    self['index'] = index
+
+    self_as_str = json.dumps(self)
+    self['id'] = hashlib.md5(self_as_str).hexdigest()
 
   def should_check_if_armed(self, board_id):
     """Should action be checked for given board?"""
@@ -54,34 +58,32 @@ class ActionStatusAdapter(dict):
   Provider helpers and functions that allows
   to easily work with action status
   """
-  def build_defaults(self, board_id, index, sensor_type):
-    self.setdefault(board_id, {})
-    self[board_id].setdefault(index, {})
-    self[board_id][index].setdefault(sensor_type, {'last_action': 0, 'last_fail': []})
+  def build_defaults(self, id_hex):
+    self.setdefault(id_hex, {'last_action': 0, 'last_fail': []})
 
-  def clean_failed(self, board_id, index, sensor_type, fail_interval):
+  def clean_failed(self, id_hex, fail_interval):
     now = int(time.time())
-    self[board_id][index][sensor_type]['last_fail'] = \
-      [i for i in self[board_id][index][sensor_type]['last_fail'] if now - i < fail_interval]
+    self[id_hex]['last_fail'] = \
+      [i for i in self[id_hex]['last_fail'] if now - i < fail_interval]
 
-  def check_failed_count(self, board_id, index, sensor_type, fail_count):
+  def check_failed_count(self, id_hex, fail_count):
     now = int(time.time())
-    failed = self[board_id][index][sensor_type]['last_fail']
+    failed = self[id_hex]['last_fail']
     if len(failed) <= fail_count - 1:
-      self[board_id][index][sensor_type]['last_fail'].append(now)
+      self[id_hex]['last_fail'].append(now)
       return False
     return True
 
-  def check_last_action(self, board_id, index, sensor_type, action_interval):
+  def check_last_action(self, id_hex, action_interval):
     now = int(time.time())
-    last_action = self[board_id][index][sensor_type]['last_action']
+    last_action = self[id_hex]['last_action']
     if now - last_action <= action_interval:
       return False
     return True
 
-  def update_last_action(self, board_id, index, sensor_type):
+  def update_last_action(self, id_hex):
     now = int(time.time())
-    self[board_id][index][sensor_type]['last_action'] = now
+    self[id_hex]['last_action'] = now
 
 
 class Mgw(mqtt.Mqtt):
@@ -124,16 +126,17 @@ class Mgw(mqtt.Mqtt):
       if not 'priority' in sensor_configs or not isinstance(sensor_configs['priority'], int):
         sensor_configs['priority'] = 500
 
-      for index, sensor_config in enumerate(sensor_configs['actions']):
+      actions = list()
+      for sensor_config in sensor_configs['actions']:
         sensor_config = SensorConfigAdapter(sensor_config)
-        sensor_config.build_defaults(index)
+        sensor_config.build_defaults()
 
         if not utils.validate_sensor_config(sensor_config):
           LOG.warning("Fail to validate data '%s', ignoring..", sensor_config)
-          del sensor_configs['actions'][index]
         else:
-          sensor_configs['actions'][index] = sensor_config
+          actions.append(sensor_config)
 
+      sensor_configs['actions'] = actions
       if len(sensor_configs['actions']):
         self.sensors_map[sensor_type] = sensor_configs
 
@@ -240,12 +243,11 @@ class Mgw(mqtt.Mqtt):
     LOG.debug("Action helper '%s' '%s'", sensor_data, sensor_configs['actions'])
     for sensor_config in sensor_configs['actions']:
 
-      self.action_status.build_defaults(sensor_data['board_id'],
-              sensor_config['index'],
-              sensor_data['sensor_type'])
-      self.action_status.clean_failed(sensor_data['board_id'],
-              sensor_config['index'],
-              sensor_data['sensor_type'],
+      action_status_id = sensor_config['id'] + sensor_data['board_id'] + sensor_data['sensor_type']
+      action_status_id_hex = hashlib.md5(action_status_id).hexdigest()
+
+      self.action_status.build_defaults(action_status_id_hex)
+      self.action_status.clean_failed(action_status_id_hex,
               sensor_config['fail_interval'])
 
       if not sensor_config.config_for_board(sensor_data['board_id']):
@@ -263,15 +265,11 @@ class Mgw(mqtt.Mqtt):
       if sensor_config.should_check_if_armed(sensor_data['board_id']) and not self.status.get('armed'):
         continue
 
-      if not self.action_status.check_failed_count(sensor_data['board_id'],
-              sensor_config['index'],
-              sensor_data['sensor_type'],
+      if not self.action_status.check_failed_count(action_status_id_hex,
               sensor_config['fail_count']):
         continue
 
-      if not self.action_status.check_last_action(sensor_data['board_id'],
-              sensor_config['index'],
-              sensor_data['sensor_type'],
+      if not self.action_status.check_last_action(action_status_id_hex,
               sensor_config['action_interval']):
         continue
 
@@ -279,7 +277,7 @@ class Mgw(mqtt.Mqtt):
               sensor_config['action'],
               action_config,
               sensor_config['action_config']):
-        self.action_status.update_last_action(sensor_data['board_id'], sensor_config['index'], sensor_data['sensor_type'])
+        self.action_status.update_last_action(action_status_id_hex)
 
   def run(self):
     LOG.info('Starting')
