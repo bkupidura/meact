@@ -14,10 +14,10 @@ from moteino_sensors import utils
 
 
 class SensorConfigAdapter(dict):
-  """Adapter for action details
+  """Adapter for sensor config
 
   Provides helpers and functions that allows
-  to easily work on action details
+  to easily work on sensor config
   """
   def build_defaults(self, index):
     self.setdefault('check_if_armed', {'default': False})
@@ -101,15 +101,43 @@ class Mgw(mqtt.Mqtt):
     self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
     self.boards_map = boards_map
-    self.sensors_map = sensors_map
     self.action_config = action_config
     self.mqtt_config = mqtt_config
     self.action_queue = Queue.PriorityQueue()
 
+    self._validate_sensors_map(sensors_map)
     self.start_mqtt()
 
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
+
+  def _validate_sensors_map(self, sensors_map):
+    self.sensors_map = dict()
+
+    for sensor_type in sensors_map:
+      sensor_configs = sensors_map[sensor_type]
+
+      if 'actions' not in sensor_configs:
+        LOG.warning("No actions defined for '%s', ignoring..", sensor_type)
+        continue
+
+      if not 'priority' in sensor_configs or not isinstance(sensor_configs['priority'], int):
+        sensor_configs['priority'] = 500
+
+      for index, sensor_config in enumerate(sensor_configs['actions']):
+        sensor_config = SensorConfigAdapter(sensor_config)
+        sensor_config.build_defaults(index)
+
+        if not utils.validate_sensor_config(sensor_config):
+          LOG.warning("Fail to validate data '%s', ignoring..", sensor_config)
+          del sensor_configs['actions'][index]
+        else:
+          sensor_configs['actions'][index] = sensor_config
+
+      if len(sensor_configs['actions']):
+        self.sensors_map[sensor_type] = sensor_configs
+
+    LOG.debug("Got new sensors_map '%s'", self.sensors_map)
 
   def _on_message_metric(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
@@ -136,10 +164,7 @@ class Mgw(mqtt.Mqtt):
     if not sensor_data or not sensor_config:
       return
 
-    if not 'priority' in sensor_config or not isinstance(sensor_config['priority'], int):
-      priority = 500
-    else:
-      priority = sensor_config['priority']
+    priority = sensor_config['priority']
 
     self.action_queue.put((priority, sensor_data, sensor_config))
 
@@ -166,20 +191,9 @@ class Mgw(mqtt.Mqtt):
     sensor_type = sensor_data.get('sensor_type')
     sensor_configs = self.sensors_map.get(sensor_type)
 
-    if not sensor_configs or 'actions' not in sensor_configs:
+    if not sensor_configs:
       LOG.debug("Missing sensor_map for sensor_type '%s'", sensor_type)
       return None
-
-    for index, sensor_config in enumerate(sensor_configs['actions']):
-
-      sensor_config = SensorConfigAdapter(sensor_config)
-      sensor_config.build_defaults(index)
-
-      if not utils.validate_sensor_config(sensor_config):
-        LOG.warning("Fail to validate data '%s', ignoring..", sensor_config)
-        return None
-      else:
-        sensor_configs['actions'][index] = sensor_config
 
     return sensor_configs
 
