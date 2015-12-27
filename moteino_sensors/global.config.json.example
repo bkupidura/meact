@@ -39,6 +39,12 @@
       "server": "localhost",
       "topic": "srl/write",
       "enabled": 0
+    },
+    "send_pushover": {
+      "endpoint": "https://api.pushover.net/1/messages.json",
+      "token": "auth_token",
+      "user_key": "user_or_group_key",
+      "enabled": 1
     }
   },
   "mqtt": {

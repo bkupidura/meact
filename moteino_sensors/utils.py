@@ -113,7 +113,7 @@ def http_request(url, method='GET', params=None, data=None, auth=None, headers=N
 def load_json(data):
   try:
     return json.loads(data)
-  except (ValueError) as e:
+  except (ValueError, TypeError) as e:
     return {}
 
 

@@ -203,7 +203,6 @@ class Mgw(mqtt.Mqtt):
   def _action_execute(self, sensor_data, actions, global_action_config, sensor_action_config):
     result = 0
 
-    LOG.info("Action execute for data '%s'", sensor_data)
     for action in actions:
       LOG.debug("Action execute '%s'", action)
 
@@ -273,6 +272,7 @@ class Mgw(mqtt.Mqtt):
               sensor_config['action_interval']):
         continue
 
+      LOG.info("Action execute for data '%s'", sensor_data)
       if self._action_execute(sensor_data,
               sensor_config['action'],
               action_config,
