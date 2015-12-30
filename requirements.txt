@@ -8,3 +8,4 @@ python-gsmmodem
 paho-mqtt
 cerberus
 sqlalchemy
+tornado

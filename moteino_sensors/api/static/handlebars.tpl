@@ -8,26 +8,24 @@
     Board: {{name}}<br />
     Offline
 </script>
-<script id="nodeOnlineTemplate" type="x-handlebars-template">
-    <h3>Online nodes</h3>
+<script id="nodeTemplate" type="x-handlebars-template">
+    <h3>Nodes</h3>
     {{#each this}}
-        <h4>
-            <span style="cursor: pointer;" class="label label-default" onclick="showCommandDialog('{{name}}')">{{desc}} ({{name}})</span>
-        </h4>
-        <h5>
-            {{#data}}
-                <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
-            {{/data}}
-        </h5>
+        {{#if data}}
+            <h4>
+                <span style="cursor: pointer;" class="label label-default" onclick="showCommandDialog('{{name}}')">{{desc}} ({{name}})</span>
+            </h4>
+            <h5>
+                {{#data}}
+                    <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
+                {{/data}}
+            </h5>
+        {{else}}
+            <h4>
+                <span class="label label-danger">{{desc}} ({{name}})</span>
+            </h4>
+        {{/if}}
     {{/each}}
-</script>
-<script id="nodeOfflineTemplate" type="x-handlebars-template">
-    <h3>Offline nodes</h3>
-    <h4>
-        {{#each this}}
-            <span class="label label-danger">{{desc}} ({{name}})</span>
-        {{/each}}
-    </h4>
 </script>
 <script id="statusServiceTemplate" type="x-handlebars-template">
     <h3>Service status</h3>

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import json
+import logging
 import os
 import time
 
@@ -12,6 +13,7 @@ from moteino_sensors import database
 
 
 app = bottle.Bottle()
+logging.getLogger('tornado.access')
 
 @app.hook('after_request')
 def after_request():
@@ -149,9 +151,11 @@ def main():
   app.config['mqtt'] = Api(app.config['appconfig'])
   app.config['mqtt'].loop_start()
 
+  utils.create_logger()
+
   app.config['db'] = database.connect(app.config['appconfig']['db_string'])
 
-  app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'])
+  app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'], server='tornado')
 
 
 if __name__ == "__main__":

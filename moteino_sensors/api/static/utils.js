@@ -194,3 +194,21 @@ function handleGraphRequest(graph_type, data) {
         series: data
     });
 }
+
+function generate_menu(type, mapping){
+    var menu = document.getElementById('dropdown-menu-' + type);
+    for (var key in mapping){
+        var li = document.createElement("li");
+
+        var href = document.createElement("a");
+        href.setAttribute('href', '#' + type);
+        href.setAttribute('tabindex', '-1');
+        href.setAttribute('data-toggle', 'tab')
+
+        var txt = document.createTextNode(key);
+
+        href.appendChild(txt);
+        li.appendChild(href);
+        menu.appendChild(li);
+    }
+}

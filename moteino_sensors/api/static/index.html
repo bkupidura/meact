@@ -31,11 +31,15 @@
         <div class="starter-template">
             <ul id="mainTabs" class="nav nav-tabs">
                 <li role="presentation"><a href="#status" id="status-tab" data-toggle="tab">Status</a></li>
-                <li role="presentation"><a href="#node" id="node-tab" data-toggle="tab">Node</a></li>
+                <li class="dropdown">
+                <a href="#" class="dropdown-toggle" id="node-tab" data-toggle="dropdown">Node<span class="caret"></span></a>
+                    <ul class="dropdown-menu" id="dropdown-menu-node" role="menu">
+                    </ul>
+                </li>
                 <li role="presentation"><a href="#map" id="map-tab" data-toggle="tab">Map</a></li>
                 <li class="dropdown">
                 <a href="#" class="dropdown-toggle" id="graph-tab" data-toggle="dropdown">Graph<span class="caret"></span></a>
-                    <ul class="dropdown-menu" id="dropdown-menu" role="menu">
+                    <ul class="dropdown-menu" id="dropdown-menu-graph" role="menu">
                     </ul>
                 </li>
             </ul>
@@ -50,22 +54,8 @@
         </div>
     </body>
     <script>
-        var menu = document.getElementById('dropdown-menu');
-        for (var key in graphs_mapping){
-            var li = document.createElement("li");
-
-            var href = document.createElement("a");
-            href.setAttribute('href', '#graph');
-            href.setAttribute('tabindex', '-1');
-            href.setAttribute('data-toggle', 'tab')
-
-            var txt = document.createTextNode(key);
-
-            href.appendChild(txt);
-            li.appendChild(href);
-
-            menu.appendChild(li);
-        }
+        generate_menu('graph', graphs_mapping);
+        generate_menu('node', node_mapping);
 
         for (var key in disabled_elems){
             var elem = document.getElementById(disabled_elems[key]);
@@ -112,23 +102,24 @@
                     });
                 } else if (href == '#node'){
                     $.getJSON(api_endpoint + '/node').done(function(data){
-                        var nodes = {'Online': [], 'Offline': []}
-
+                        var node_type = $(ev.target).text();
+                        var nodes = [];
                         var node_html = '';
 
                         for (var k in data){
-                            if (data[k]['data'].length){
-                                nodes['Online'].push(data[k]);
-                            } else {
-                                nodes['Offline'].push(data[k]);
+                            if (node_type == 'Offline' && data[k]['data'].length == 0){
+                                nodes.push(data[k]);
+                            } else if (data[k]['data'].length){
+                                if (node_mapping[node_type].indexOf(data[k]['name']) >= 0){
+                                    nodes.push(data[k]);
+                                }
                             }
                         }
-                        for (var k in nodes){
-                            var source = $(href + k + 'Template').html();
-                            var template = Handlebars.compile(source);
 
-                            node_html += template(nodes[k]);
-                        }
+                        var source = $(href + 'Template').html();
+                        var template = Handlebars.compile(source);
+
+                        node_html += template(nodes);
 
                         $(href).html(node_html);
                     });
