@@ -54,5 +54,12 @@
       "mgmt": "mgmt"
     }
   },
+  "status": {
+    "mgw": 1,
+    "msd": 1,
+    "srl": 1,
+    "armed": 1,
+    "fence": 1
+  },
   "db_string": "sqlite:////etc/mgw/mgw.db"
 }
