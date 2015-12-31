@@ -13,7 +13,9 @@
     {{#each this}}
         {{#if data}}
             <h4>
-                <span style="cursor: pointer;" class="label label-default" onclick="showCommandDialog('{{name}}')">{{desc}} ({{name}})</span>
+                <button class="btn btn-primary btn-xs" onclick="showCommandDialog('{{name}}')">
+                    {{desc}} ({{name}})
+                </button>
             </h4>
             <h5>
                 {{#data}}
@@ -22,7 +24,9 @@
             </h5>
         {{else}}
             <h4>
-                <span class="label label-danger">{{desc}} ({{name}})</span>
+                <button class="btn btn-danger btn-xs disabled">
+                    {{desc}} ({{name}})
+                </button>
             </h4>
         {{/if}}
     {{/each}}
@@ -33,13 +37,25 @@
         <div class="row">
             <h4>
             {{#each this}}
-                <div class="col-sm-8 margin">{{@key}}</div>
-                <div class="col-sm-4 margin">
+                <div class="col-sm-4 margin">{{@key}}</div>
+                <div class="col-sm-8 margin">
+                <div class="btn-group btn-toggle">
                 {{#if this}}
-                    <span style="cursor: pointer;" class="label label-success" onclick="invertStatus('{{@key}}', '{{this}}')">Enabled</span>
+                <button class="btn btn-general btn-xs" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    Off
+                </button>
+                <button class="btn btn-success btn-xs active" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    On
+                </button>
                 {{else}}
-                    <span style="cursor: pointer;" class="label label-danger" onclick="invertStatus('{{@key}}', '{{this}}')">Disabled</span>
+                <button class="btn btn-warning btn-xs active" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    Off
+                </button>
+                <button class="btn btn-general btn-xs" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    On
+                </button>
                 {{/if}}
+                </div>
                 </div>
            {{/each}}
             </h4>
@@ -52,13 +68,25 @@
         <div class="row">
             <h4>
             {{#each this}}
-                <div class="col-sm-8 margin">{{@key}}</div>
-                <div class="col-sm-4 margin">
+                <div class="col-sm-4 margin">{{@key}}</div>
+                <div class="col-sm-8 margin">
+                <div class="btn-group btn-toggle">
                 {{#if this}}
-                    <span style="cursor: pointer;" class="label label-success" onclick="invertStatus('{{@key}}', '{{this}}')">True</span>
+                <button class="btn btn-general btn-xs" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    False
+                </button>
+                <button class="btn btn-success btn-xs active" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    True
+                </button>
                 {{else}}
-                    <span style="cursor: pointer;" class="label label-danger" onclick="invertStatus('{{@key}}', '{{this}}')">False</span>
+                <button class="btn btn-warning btn-xs active" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    False
+                </button>
+                <button class="btn btn-general btn-xs" onclick="invertStatus('{{@key}}', '{{this}}')">
+                    True
+                </button>
                 {{/if}}
+                </div>
                 </div>
            {{/each}}
             </h4>

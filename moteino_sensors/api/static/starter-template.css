@@ -32,3 +32,6 @@ body {
   color: #fff;
   border-radius: 2px;
 }
+.btn:focus {
+  outline: none;
+}
