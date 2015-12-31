@@ -10,17 +10,14 @@ from moteino_sensors import mqtt
 from moteino_sensors import utils
 
 class Srl(mqtt.Mqtt):
-  # [ID][metric:value] / [10][voltage:3.3]
-  _re_sensor_data = re.compile(
-    '\[(?P<board_id>.+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]')
-
-  def __init__(self, serial, mqtt_config):
+  def __init__(self, serial, mqtt_config, re_sensor_data):
     super(Srl, self).__init__()
     self.name = 'srl'
     self.enabled = Event()
     self.enabled.set()
     self.serial = serial
     self.mqtt_config = mqtt_config
+    self._re_sensor_data = re.compile(re_sensor_data)
     self.start_mqtt()
 
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/write', self._on_message_write)
@@ -91,7 +88,8 @@ def main():
   )
   srl = Srl(
     serial=ser,
-    mqtt_config=conf['mqtt'])
+    mqtt_config=conf['mqtt'],
+    re_sensor_data=conf['re_sensor_data'])
 
   srl.run()
 

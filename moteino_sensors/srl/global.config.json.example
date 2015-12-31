@@ -11,5 +11,6 @@
       "mgw": "mgw",
       "srl": "srl"
     }
-  }
+  },
+  "re_sensor_data": "\\[(?P<board_id>.+)\\]\\[(?P<sensor_type>.+):(?P<sensor_data>.+)\\]"
 }
