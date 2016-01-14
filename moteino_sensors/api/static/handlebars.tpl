@@ -1,5 +1,6 @@
 <script id="mapOnlineTemplate" type="x-handlebars-template">
     Board: {{name}}<br />
+    seen: {{UpdateToSec last_update}}<br />
     {{#data}}
         {{0}}: {{1}}<br />
     {{/data}}
@@ -18,6 +19,7 @@
                 </button>
             </h4>
             <h5>
+                <span class="label label-default">seen: {{UpdateToSec last_update}}</span>&nbsp;
                 {{#data}}
                     <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
                 {{/data}}

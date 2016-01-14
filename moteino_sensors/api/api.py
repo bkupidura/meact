@@ -82,12 +82,17 @@ def get_nodes(board_id=None):
 
   output = list()
   for board in boards:
-    output.append({"name": board.board_id, "desc": board.board_desc, "data": []})
+    output.append({"name": board.board_id,
+        "desc": board.board_desc,
+        "last_update": 0,
+        "data": []})
 
     metrics = database.get_last_metrics(app.config['db'], board_ids=board.board_id, start=start, end=end)
 
     for metric in metrics:
       output[-1]['data'].append((metric.sensor_type, metric.sensor_data))
+      if output[-1]['last_update'] < metric.last_update:
+        output[-1]['last_update'] = metric.last_update
 
   return json.dumps(output)
 
