@@ -111,10 +111,12 @@ function afterSetExtremes(e) {
             var name = data[id_j]['name']
             $.each(chart.series, function(id_s, value){
                 if (chart.series[id_s]['name'] == name){
-                    chart.series[id_s].setData(data[id_j]['data']);
+                    chart.series[id_s].setData(data[id_j]['data'], false);
+                    return false;
                 }
             });
         });
+        chart.redraw();
         chart.hideLoading();
     });
 }
@@ -163,7 +165,7 @@ function handleGraphRequest(graph_type, data) {
         },
         navigator : {
             enabled: true,
-            adaptToUpdatedData: false,
+            adaptToUpdatedData: true,
             series : {
                 data : [[chart_begin, 0]],
             },
