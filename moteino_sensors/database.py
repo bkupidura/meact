@@ -1,3 +1,4 @@
+import logging
 import time
 
 from sqlalchemy import Column, Integer, Text, Index, ForeignKey, desc, DDL, event, create_engine
@@ -6,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 Base = declarative_base()
+LOG = logging.getLogger(__name__)
 
 class Metric(Base):
   __tablename__ = 'metrics'
@@ -109,7 +111,7 @@ def sync_boards(db, boards_map):
   for board in boards_map.iteritems():
     b = Board(board_id=board[0], board_desc=board[1])
     s.add(b)
-  s.commit()
+  commit(s)
 
 
 def insert_metric(db, sensor_data):
@@ -122,7 +124,7 @@ def insert_metric(db, sensor_data):
           sensor_data = sensor_data['sensor_data'],
           last_update = now))
 
-  s.commit()
+  commit(s)
 
 
 def prepare_board_ids(board_ids=None):
@@ -187,11 +189,23 @@ def update_metric(db, metric_id=None, sensor_data=None):
   metric = s.query(Metric).filter(Metric.id == metric_id).first()
   if metric and sensor_data:
     metric.sensor_data = sensor_data
-    s.commit()
+    commit(s)
 
 
 def delete_metrics(db, record_ids=None):
   if record_ids:
     s = create_session(db)
     query = s.query(Metric).filter(Metric.id.in_(record_ids)).delete('fetch')
-    s.commit()
+    commit(s)
+
+def commit(session=None):
+  if session:
+    try:
+      session.commit()
+    except:
+      LOG.error('Fail to commit data')
+      session.rollback()
+    finally:
+      session.close()
+  else:
+    LOG.warning('No session was provided for commit')
