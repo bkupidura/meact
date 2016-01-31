@@ -80,21 +80,23 @@ def get_nodes(board_id=None):
 
   boards = database.get_boards(app.config['db'], board_ids=board_id)
 
-  output = list()
-  for board in boards:
-    output.append({"name": board.board_id,
-        "desc": board.board_desc,
-        "last_update": 0,
-        "data": []})
+  board_ids = [board.board_id for board in boards]
+  board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
-    metrics = database.get_last_metrics(app.config['db'], board_ids=board.board_id, start=start, end=end)
+  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end)
 
-    for metric in metrics:
-      output[-1]['data'].append((metric.sensor_type, metric.sensor_data))
-      if output[-1]['last_update'] < metric.last_update:
-        output[-1]['last_update'] = metric.last_update
+  output = dict()
+  for metric in last_metrics:
+    output.setdefault(metric.board_id, {'name': metric.board_id,
+      'desc': board_desc[metric.board_id],
+      'data': [],
+      'last_update': 0
+    })
+    output[metric.board_id]['data'].append((metric.sensor_type, metric.sensor_data))
+    if output[metric.board_id]['last_update'] < metric.last_update:
+      output[metric.board_id]['last_update'] = metric.last_update
 
-  return json.dumps(output)
+  return json.dumps(output.values())
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
