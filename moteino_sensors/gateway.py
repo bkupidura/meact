@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import random
+import signal
 import sqlite3
 import sys
 import time
@@ -87,7 +88,7 @@ class ActionStatusAdapter(dict):
 
 
 class Mgw(mqtt.Mqtt):
-  def __init__(self, db_string, boards_map, sensors_map, action_config, mqtt_config, status):
+  def __init__(self, db_string, boards_map, sensors_map_file, action_config, mqtt_config, status):
     super(Mgw, self).__init__()
     self.name = 'mgw'
     self.enabled = Event()
@@ -100,13 +101,22 @@ class Mgw(mqtt.Mqtt):
     self.status = status
     self.action_queue = Queue.PriorityQueue()
 
-    self._validate_sensors_map(sensors_map)
+    signal.signal(signal.SIGUSR1, self._handle_signal)
+
+    self.sensors_map_file = sensors_map_file
+    self._validate_sensors_map(self.sensors_map_file)
     self.start_mqtt()
 
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
 
-  def _validate_sensors_map(self, sensors_map):
+  def _handle_signal(self, signum, stack):
+    LOG.info("Got signal '%s'", signum)
+    if signum == signal.SIGUSR1:
+      self._validate_sensors_map(self.sensors_map_file)
+
+  def _validate_sensors_map(self, sensors_map_file):
+    sensors_map = utils.load_config(sensors_map_file)
     self.sensors_map = dict()
 
     for sensor_type in sensors_map:
@@ -133,7 +143,7 @@ class Mgw(mqtt.Mqtt):
       if len(sensor_configs['actions']):
         self.sensors_map[sensor_type] = sensor_configs
 
-    LOG.debug("Got new sensors_map '%s'", self.sensors_map)
+    LOG.info("Got new sensors_map '%s'", self.sensors_map)
 
   def _on_message_metric(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
@@ -298,8 +308,9 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
-  sensors_map = utils.load_config(args.dir + '/sensors.config.json')
   boards_map = utils.load_config(args.dir + '/boards.config.json')
+
+  sensors_map_file = args.dir + '/sensors.config.json'
 
   db = database.connect(conf['db_string'])
 
@@ -319,7 +330,7 @@ def main():
   mgw = Mgw(
     db_string=conf['db_string'],
     boards_map=boards_map,
-    sensors_map=sensors_map,
+    sensors_map_file=sensors_map_file,
     action_config=conf['action_config'],
     mqtt_config=conf['mqtt'],
     status=conf['status'])
