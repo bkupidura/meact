@@ -5,7 +5,8 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "dbsm": "mgw"
+      "dbsm": "mgw",
+      "mgmt": "mgmt"
     }
   },
   "db_string": "sqlite:////etc/mgw/mgw.db"
