@@ -303,8 +303,6 @@ def main():
   conf = utils.load_config(args.dir + '/global.config.json')
   sensors_map_file = args.dir + '/sensors.config.json'
 
-  db = database.connect(conf['db_string'])
-
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
