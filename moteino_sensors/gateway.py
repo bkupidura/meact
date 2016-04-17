@@ -108,7 +108,7 @@ class Mgw(mqtt.Mqtt):
 
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_action)
+    self.mqtt.message_callback_add(self.mqtt_config['topic']['dbsm'], self._on_message_action)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
 
   def _handle_signal(self, signum, stack):

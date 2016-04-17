@@ -60,10 +60,13 @@ class Mqtt(object):
     topic = self.mqtt_config.get('topic', {})
     subscribe_to = []
 
-    if self.name in topic:
-      subscribe_to.append(topic[self.name]+'/#')
-    if 'mgmt' in topic:
-      subscribe_to.append(topic['mgmt']+'/status')
+    for t in topic:
+      if t == self.name:
+        subscribe_to.append(topic[t]+'/#')
+      elif t == 'mgmt':
+        subscribe_to.append(topic[t]+'/status')
+      else:
+        subscribe_to.append(topic[t])
 
     userdata = {
       'subscribe_to': subscribe_to

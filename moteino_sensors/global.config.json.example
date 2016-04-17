@@ -51,7 +51,8 @@
     "server": "localhost",
     "topic": {
       "mgw": "mgw",
-      "mgmt": "mgmt"
+      "mgmt": "mgmt",
+      "dbsm": "dbsm/metric"
     }
   },
   "status": {

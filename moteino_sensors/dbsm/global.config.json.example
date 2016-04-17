@@ -5,7 +5,7 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "dbsm": "mgw",
+      "dbsm": "dbsm",
       "mgmt": "mgmt"
     }
   },
