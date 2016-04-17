@@ -7,8 +7,6 @@ import json
 import logging
 import random
 import signal
-import sqlite3
-import sys
 import time
 
 from moteino_sensors import database
@@ -88,32 +86,37 @@ class ActionStatusAdapter(dict):
 
 
 class Mgw(mqtt.Mqtt):
-  def __init__(self, db_string, boards_map, sensors_map_file, action_config, mqtt_config, status):
+  def __init__(self, db_string, sensors_map_file, action_config, mqtt_config, status):
     super(Mgw, self).__init__()
     self.name = 'mgw'
     self.enabled = Event()
     self.enabled.set()
     self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
-    self.boards_map = boards_map
     self.action_config = action_config
     self.mqtt_config = mqtt_config
     self.status = status
     self.action_queue = Queue.PriorityQueue()
 
     signal.signal(signal.SIGUSR1, self._handle_signal)
+    signal.signal(signal.SIGUSR2, self._handle_signal)
 
     self.sensors_map_file = sensors_map_file
     self._validate_sensors_map(self.sensors_map_file)
+
+    self._get_boards(self.db)
+
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
+    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_action)
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
 
   def _handle_signal(self, signum, stack):
     LOG.info("Got signal '%s'", signum)
     if signum == signal.SIGUSR1:
       self._validate_sensors_map(self.sensors_map_file)
+    elif signum == signal.SIGUSR2:
+      self._get_boards(self.db)
 
   def _validate_sensors_map(self, sensors_map_file):
     sensors_map = utils.load_config(sensors_map_file)
@@ -145,13 +148,11 @@ class Mgw(mqtt.Mqtt):
 
     LOG.info("Got new sensors_map '%s'", self.sensors_map)
 
-  def _on_message_metric(self, client, userdata, msg):
-    sensor_data = utils.load_json(msg.payload)
+  def _get_boards(self, db):
+    boards = database.get_boards(db)
+    self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
 
-    sensor_data, sensor_config = self._prepare_data(sensor_data)
-
-    self._save_sensors_data(sensor_data)
-    self._put_in_queue(sensor_data, sensor_config)
+    LOG.info("Got new boards '%s'", self.boards_map)
 
   def _on_message_action(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
@@ -159,12 +160,6 @@ class Mgw(mqtt.Mqtt):
     sensor_data, sensor_config = self._prepare_data(sensor_data)
 
     self._put_in_queue(sensor_data, sensor_config)
-
-  def _save_sensors_data(self, sensor_data):
-    if not sensor_data:
-      return
-
-    database.insert_metric(self.db, sensor_data)
 
   def _put_in_queue(self, sensor_data, sensor_config):
     if not sensor_data or not sensor_config:
@@ -303,33 +298,18 @@ ACTIONS_MAPPING = utils.load_actions()
 
 def main():
   parser = utils.create_arg_parser('Moteino gateway')
-  parser.add_argument('--create-db', required=False, help='Crate mgw database. CAUTION: IT WILL REMOVE OLD DATA', action="store_true")
-  parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
-  boards_map = utils.load_config(args.dir + '/boards.config.json')
-
   sensors_map_file = args.dir + '/sensors.config.json'
 
   db = database.connect(conf['db_string'])
-
-  if args.create_db:
-    database.create_db(db, boards_map)
-    print('Database created in {}'.format(conf['db_string']))
-    sys.exit(0)
-
-  if args.sync_db_desc:
-    database.sync_boards(db, boards_map)
-    print('Syned boards in {}'.format(conf['db_string']))
-    sys.exit(0)
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
   mgw = Mgw(
     db_string=conf['db_string'],
-    boards_map=boards_map,
     sensors_map_file=sensors_map_file,
     action_config=conf['action_config'],
     mqtt_config=conf['mqtt'],

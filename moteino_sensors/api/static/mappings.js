@@ -13,7 +13,7 @@ graphs_mapping = {
 }
 
 status_mapping = {
-    'Service': ['msd', 'mgw', 'srl', 'fence'],
+    'Service': ['msd', 'mgw', 'srl', 'fence', 'dbsm'],
     'Status': ['armed']
 }
 

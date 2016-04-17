@@ -59,7 +59,8 @@
     "msd": 1,
     "srl": 1,
     "armed": 1,
-    "fence": 1
+    "fence": 1,
+    "dbsm": 1
   },
   "db_string": "sqlite:////etc/mgw/mgw.db"
 }

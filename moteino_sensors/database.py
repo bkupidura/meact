@@ -51,7 +51,7 @@ class Board(Base):
   board_desc = Column(Text, nullable=False)
 
   def __repr__(self):
-    return "<Metric(board_id='%s', board_desc='%s')>" % (
+    return "<Board(board_id='%s', board_desc='%s')>" % (
             self.board_id,
             self.board_desc)
 

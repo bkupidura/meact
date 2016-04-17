@@ -1,0 +1,12 @@
+{
+  "logging": {
+    "level": 20
+  },
+  "mqtt": {
+    "server": "localhost",
+    "topic": {
+      "dbsm": "mgw"
+    }
+  },
+  "db_string": "sqlite:////etc/mgw/mgw.db"
+}
