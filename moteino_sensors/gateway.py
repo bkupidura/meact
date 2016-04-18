@@ -58,8 +58,13 @@ class ActionStatusAdapter(dict):
   Provider helpers and functions that allows
   to easily work with action status
   """
-  def build_defaults(self, id_hex):
-    self.setdefault(id_hex, {'last_action': 0, 'last_fail': [], 'last_value': []})
+  def build_defaults(self, id_hex, sensor_config_id, board_id, sensor_type):
+    self.setdefault(id_hex, {'last_action': 0,
+        'last_fail': [],
+        'last_value': [],
+        'sensor_config_id': sensor_config_id,
+        'board_id': board_id,
+        'sensor_type': sensor_type})
 
   def clean_failed(self, id_hex, fail_interval):
     now = int(time.time())
@@ -254,7 +259,10 @@ class Mgw(mqtt.Mqtt):
       action_status_id = sensor_config['id'] + sensor_data['board_id'] + sensor_data['sensor_type']
       action_status_id_hex = hashlib.md5(action_status_id).hexdigest()
 
-      self.action_status.build_defaults(action_status_id_hex)
+      self.action_status.build_defaults(action_status_id_hex,
+              sensor_config['id'],
+              sensor_data['board_id'],
+              sensor_data['sensor_type'])
       self.action_status.clean_failed(action_status_id_hex,
               sensor_config['fail_interval'])
 
