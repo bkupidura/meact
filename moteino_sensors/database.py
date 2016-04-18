@@ -88,7 +88,7 @@ event.listen(
 )
 
 def connect(connect_string):
-  return create_engine(connect_string)
+  return create_engine(connect_string, connect_args={'check_same_thread': False})
 
 
 def create_session(db):
