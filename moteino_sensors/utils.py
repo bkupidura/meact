@@ -66,7 +66,8 @@ def validate_sensor_config(data):
             'action_config': {'required': True, 'type': 'dict', 'valueschema':
                 {'type': 'dict'}},
             'board_ids': {'required': True, 'type': 'list', 'schema':
-                {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}
+                {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}},
+            'value_count': {'required': True, 'type': 'integer', 'min': 0}
             }
   v = ActionValidator()
   return v.validate(data, schema)

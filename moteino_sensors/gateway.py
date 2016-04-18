@@ -29,6 +29,7 @@ class SensorConfigAdapter(dict):
     self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
     self.setdefault('action_config', {})
     self.setdefault('board_ids', [])
+    self.setdefault('value_count', 0)
 
     self['check_if_armed'].setdefault('except', [])
 
@@ -58,7 +59,7 @@ class ActionStatusAdapter(dict):
   to easily work with action status
   """
   def build_defaults(self, id_hex):
-    self.setdefault(id_hex, {'last_action': 0, 'last_fail': []})
+    self.setdefault(id_hex, {'last_action': 0, 'last_fail': [], 'last_value': []})
 
   def clean_failed(self, id_hex, fail_interval):
     now = int(time.time())
@@ -83,6 +84,15 @@ class ActionStatusAdapter(dict):
   def update_last_action(self, id_hex):
     now = int(time.time())
     self[id_hex]['last_action'] = now
+
+  def update_values(self, id_hex, value_count, value):
+    if value_count > 0:
+      self[id_hex]['last_value'].append(value)
+      while len(self[id_hex]['last_value']) > value_count:
+        self[id_hex]['last_value'].pop(0)
+
+  def get_values(self, id_hex):
+    return self[id_hex]['last_value']
 
 
 class Mgw(mqtt.Mqtt):
@@ -250,7 +260,20 @@ class Mgw(mqtt.Mqtt):
       if not sensor_config.config_for_board(sensor_data['board_id']):
         continue
 
-      if not eval(sensor_config['threshold'])(sensor_data['sensor_data']):
+      threshold_func = eval(sensor_config['threshold'])
+      threshold_func_arg_number = threshold_func.func_code.co_argcount
+      if threshold_func_arg_number == 1:
+        threshold_result = threshold_func(sensor_data['sensor_data'])
+      elif threshold_func_arg_number == 2:
+        try:
+          threshold_result = threshold_func(sensor_data['sensor_data'], self.action_status.get_values(action_status_id_hex))
+        except (IndexError):
+          LOG.info('Not enough values stored to check threshold')
+          threshold_result = False
+
+      self.action_status.update_values(action_status_id_hex, sensor_config['value_count'], sensor_data['sensor_data'])
+
+      if not threshold_result:
         continue
 
       try:
