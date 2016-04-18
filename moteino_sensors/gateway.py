@@ -108,8 +108,8 @@ class Mgw(mqtt.Mqtt):
     self.status = status
     self.action_queue = Queue.PriorityQueue()
 
+    signal.signal(signal.SIGHUP, self._handle_signal)
     signal.signal(signal.SIGUSR1, self._handle_signal)
-    signal.signal(signal.SIGUSR2, self._handle_signal)
 
     self.sensors_map_file = sensors_map_file
     self._validate_sensors_map(self.sensors_map_file)
@@ -122,11 +122,16 @@ class Mgw(mqtt.Mqtt):
     self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
 
   def _handle_signal(self, signum, stack):
-    LOG.info("Got signal '%s'", signum)
-    if signum == signal.SIGUSR1:
-      self._validate_sensors_map(self.sensors_map_file)
-    elif signum == signal.SIGUSR2:
+    if signum == signal.SIGHUP:
+      LOG.info('Refreshing boards and sensors map')
       self._get_boards(self.db)
+      self._validate_sensors_map(self.sensors_map_file)
+    elif signum == signal.SIGUSR1:
+      LOG.info("Action status: %s", self.action_status)
+      LOG.info("Action config: %s", self.action_config)
+      LOG.info("Sensors map: %s", self.sensors_map)
+      LOG.info("Boards map: %s", self.boards_map)
+
 
   def _validate_sensors_map(self, sensors_map_file):
     sensors_map = utils.load_config(sensors_map_file)
@@ -156,13 +161,9 @@ class Mgw(mqtt.Mqtt):
       if len(sensor_configs['actions']):
         self.sensors_map[sensor_type] = sensor_configs
 
-    LOG.info("Got new sensors_map '%s'", self.sensors_map)
-
   def _get_boards(self, db):
     boards = database.get_boards(db)
     self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
-
-    LOG.info("Got new boards '%s'", self.boards_map)
 
   def _on_message_action(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
