@@ -56,37 +56,6 @@ class Board(Base):
             self.board_desc)
 
 
-TRIGGER_SQLITE_INSERT = DDL("""
-CREATE TRIGGER insert_metric
-  INSERT ON metrics WHEN NOT EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id = new.board_id and sensor_type = new.sensor_type
-  )
-  BEGIN
-    INSERT into last_metrics VALUES (new.board_id, new.sensor_type, new.sensor_data, new.last_update);
-  END;
-""")
-
-TRIGGER_SQLITE_UPDATE = DDL("""
-CREATE TRIGGER update_metric
-  INSERT ON metrics WHEN EXISTS (
-    SELECT 1 FROM last_metrics WHERE board_id = new.board_id and sensor_type = new.sensor_type
-  )
-  BEGIN
-    UPDATE last_metrics SET sensor_data = new.sensor_data, last_update = new.last_update WHERE board_id = new.board_id and sensor_type = new.sensor_type;
-  END;
-""")
-
-event.listen(
-  Base.metadata,
-  'after_create',
-  TRIGGER_SQLITE_INSERT.execute_if(dialect='sqlite')
-)
-event.listen(
-  Base.metadata,
-  'after_create',
-  TRIGGER_SQLITE_UPDATE.execute_if(dialect='sqlite')
-)
-
 def connect(connect_string):
   return create_engine(connect_string, connect_args={'check_same_thread': False})
 
@@ -124,6 +93,16 @@ def insert_metric(db, sensor_data):
           sensor_data = sensor_data['sensor_data'],
           last_update = now))
 
+  last_metric = s.query(LastMetric).filter(LastMetric.board_id == sensor_data['board_id'],
+          LastMetric.sensor_type == sensor_data['sensor_type'])
+  if last_metric.scalar():
+    last_metric.update({'sensor_data': sensor_data['sensor_data'],
+        'last_update': now})
+  else:
+    s.add(LastMetric(board_id = sensor_data['board_id'],
+        sensor_type = sensor_data['sensor_type'],
+        sensor_data = sensor_data['sensor_data'],
+        last_update = now))
   commit(s)
 
 
