@@ -58,15 +58,11 @@ class Mqtt(object):
       self.status = {}
 
     topic = self.mqtt_config.get('topic', {})
+    topic_subscribe = topic.get('subscribe', {})
     subscribe_to = []
 
-    for t in topic:
-      if t == self.name:
-        subscribe_to.append(topic[t]+'/#')
-      elif t == 'mgmt':
-        subscribe_to.append(topic[t]+'/status')
-      else:
-        subscribe_to.append(topic[t])
+    for t in topic_subscribe:
+      subscribe_to.append(topic_subscribe[t])
 
     userdata = {
       'subscribe_to': subscribe_to
@@ -74,8 +70,11 @@ class Mqtt(object):
     self.mqtt = paho.Client(userdata=userdata)
     self._connect(self.mqtt_config['server'])
 
-    if 'mgmt' in topic:
-      self.mqtt.message_callback_add(topic['mgmt']+'/status', self._on_mgmt_status)
+    for t in topic_subscribe:
+      if topic_subscribe[t] == 'mgmt/status':
+        self.mqtt.message_callback_add(topic_subscribe[t], self._on_mgmt_status)
+      else:
+        self.mqtt.message_callback_add(topic_subscribe[t], self._on_message)
 
   def loop_start(self):
     self.mqtt.loop_start()
@@ -95,17 +94,17 @@ class Mqtt(object):
 
   def publish_status(self, status=None):
     topic = self.mqtt_config.get('topic', {})
-    if hasattr(self, 'status') and 'mgmt' in topic:
+    if hasattr(self, 'status') and 'mgmt/status' in topic:
       if status:
         self.status.update(status)
-      self.publish(topic['mgmt'] + '/status', self.status, retain=True)
+      self.publish(topic['mgmt/status'], self.status, retain=True)
 
-    if hasattr(self, 'status') and 'mgw' in topic:
+    if hasattr(self, 'status') and 'mgw/action' in topic:
       if not status:
         status = self.status
       for key in status:
         sensor_data = self._create_sensor_data('status_' + key, status[key])
-        self.publish(topic['mgw'] + '/action', sensor_data)
+        self.publish(topic['mgw/action'], sensor_data)
 
   def subscribe(self, topic):
     if isinstance(topic, str) or isinstance(topic, unicode):

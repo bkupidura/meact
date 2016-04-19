@@ -6,7 +6,11 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "mgmt": "mgmt"
+      "subscribe": {
+         "mgmt/status": "mgmt/status"
+       },
+       "mgmt/status": "mgmt/status",
+       "mgw/action": "mgw/action"
     }
   }
 }

@@ -9,8 +9,11 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-        "mgmt": "mgmt",
-        "mgw": "mgw"
+      "subscribe": {
+         "mgmt/status": "mgmt/status"
+       },
+       "mgmt/status": "mgmt/status",
+       "mgw/action": "mgw/action"
     }
   } 
 }

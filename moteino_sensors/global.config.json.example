@@ -50,9 +50,13 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "mgw": "mgw",
-      "mgmt": "mgmt",
-      "dbsm": "dbsm/metric"
+      "subscribe": {
+         "mgmt/status": "mgmt/status",
+         "mgw/action": "mgw/action",
+         "dbsm/metric": "dbsm/metric"
+       },
+       "mgmt/status": "mgmt/status",
+       "mgw/action": "mgw/action"
     }
   },
   "status": {

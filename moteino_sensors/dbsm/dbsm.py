@@ -22,9 +22,7 @@ class Dbsm(mqtt.Mqtt):
 
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/metric', self._on_message_metric)
-
-  def _on_message_metric(self, client, userdata, msg):
+  def _on_message(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
 
     sensor_data = self._prepare_sensor_data(sensor_data)

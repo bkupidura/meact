@@ -5,8 +5,10 @@
   "mqtt": {
     "server": "localhost",
     "topic": {
-      "dbsm": "dbsm",
-      "mgmt": "mgmt"
+      "subscribe": {
+         "mgmt/status": "mgmt/status",
+         "dbsm/metric": "dbsm/metric"
+       }
     }
   },
   "db_string": "sqlite:////etc/mgw/mgw.db"

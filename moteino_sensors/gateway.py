@@ -123,9 +123,6 @@ class Mgw(mqtt.Mqtt):
 
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic']['dbsm'], self._on_message_action)
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/action', self._on_message_action)
-
   def _handle_signal(self, signum, stack):
     if signum == signal.SIGHUP:
       LOG.info('Refreshing boards and sensors map')
@@ -170,7 +167,7 @@ class Mgw(mqtt.Mqtt):
     boards = database.get_boards(db)
     self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
 
-  def _on_message_action(self, client, userdata, msg):
+  def _on_message(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
 
     sensor_data, sensor_config = self._prepare_data(sensor_data)

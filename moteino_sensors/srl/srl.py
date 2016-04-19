@@ -20,9 +20,7 @@ class Srl(mqtt.Mqtt):
     self._re_sensor_data = re.compile(re_sensor_data)
     self.start_mqtt()
 
-    self.mqtt.message_callback_add(self.mqtt_config['topic'][self.name]+'/write', self._on_message_write)
-
-  def _on_message_write(self, client, userdata, msg):
+  def _on_message(self, client, userdata, msg):
     data = utils.load_json(msg.payload)
     if not data:
       data = msg.payload
@@ -67,7 +65,7 @@ class Srl(mqtt.Mqtt):
         continue
 
       LOG.debug("Got data from serial '%s'", sensor_data)
-      self.publish(self.mqtt_config['topic']['dbsm']+'/metric', sensor_data)
+      self.publish(self.mqtt_config['topic']['dbsm/metric'], sensor_data)
 
 
 LOG = logging.getLogger(__name__)
