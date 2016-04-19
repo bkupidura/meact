@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from threading import Event
+import Queue
 import logging
 import sys
 import time
@@ -17,6 +18,7 @@ class Dbsm(mqtt.Mqtt):
     self.enabled.set()
     self.db = database.connect(db_string)
     self.mqtt_config = mqtt_config
+    self.metric_queue = Queue.Queue()
 
     self.start_mqtt()
 
@@ -27,15 +29,8 @@ class Dbsm(mqtt.Mqtt):
 
     sensor_data = self._prepare_sensor_data(sensor_data)
 
-    LOG.debug("Got new metric '%s'", sensor_data)
-
-    self._save_sensors_data(sensor_data)
-
-  def _save_sensors_data(self, sensor_data):
-    if not sensor_data:
-      return
-
-    database.insert_metric(self.db, sensor_data)
+    if sensor_data:
+      self.metric_queue.put(sensor_data)
 
   def _prepare_sensor_data(self, sensor_data):
     if not utils.validate_sensor_data(sensor_data):
@@ -49,7 +44,14 @@ class Dbsm(mqtt.Mqtt):
     self.loop_start()
     while True:
       self.enabled.wait()
-      time.sleep(0.5)
+      try:
+        sensor_data = self.metric_queue.get(True, 5)
+      except (Queue.Empty) as e:
+        continue
+
+      LOG.debug("Got new metric '%s'", sensor_data)
+
+      database.insert_metric(self.db, sensor_data)
 
 
 LOG = logging.getLogger(__name__)
