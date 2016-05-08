@@ -17,10 +17,9 @@ class SensorActionAdapter(dict):
   """Adapter for sensor action from SensorConfig
   """
   def build_defaults(self):
-    self.setdefault('check_if_armed', {'default': False})
-    self['check_if_armed'].setdefault('except', [])
+    self.setdefault('check_status', {})
     self.setdefault('action_interval', 0)
-    self.setdefault('threshold', 'lambda x: True')
+    self.setdefault('threshold', 'lambda: True')
     self.setdefault('fail_count', 0)
     self.setdefault('fail_interval', 600)
     self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
@@ -29,14 +28,6 @@ class SensorActionAdapter(dict):
 
     self_as_str = json.dumps(self)
     self['id'] = hashlib.md5(self_as_str).hexdigest()
-
-  def should_check_if_armed(self, board_id):
-    """Should action be checked for given board?"""
-    return (
-      self['check_if_armed']['default']
-      ^
-      (board_id in self['check_if_armed']['except'])
-    )
 
   def action_for_board(self, board_id):
     if self['board_ids'] and board_id in self['board_ids']:
@@ -209,6 +200,22 @@ class Mgw(mqtt.Mqtt):
 
     return sensor_configs
 
+  def _eval_helper(self, threshold_lambda, data, last_values):
+    threshold_func = eval(threshold_lambda)
+    threshold_func_arg_number = threshold_func.func_code.co_argcount
+
+    if threshold_func_arg_number == 0:
+      threshold_result = threshold_func()
+    elif threshold_func_arg_number == 1:
+      threshold_result = threshold_func(data)
+    elif threshold_func_arg_number == 2:
+      try:
+        threshold_result = threshold_func(data, last_values)
+      except (IndexError):
+        LOG.info('Not enough values stored to check threshold')
+        threshold_result = False
+    return threshold_result
+
   def _action_execute(self, sensor_data, actions, global_action_config, sensor_action_config):
     result = 0
 
@@ -265,18 +272,13 @@ class Mgw(mqtt.Mqtt):
       if not sensor_action.action_for_board(sensor_data['board_id']):
         continue
 
-      threshold_func = eval(sensor_action['threshold'])
-      threshold_func_arg_number = threshold_func.func_code.co_argcount
-      if threshold_func_arg_number == 1:
-        threshold_result = threshold_func(sensor_data['sensor_data'])
-      elif threshold_func_arg_number == 2:
-        try:
-          threshold_result = threshold_func(sensor_data['sensor_data'], self.action_status.get_values(action_status_id_hex))
-        except (IndexError):
-          LOG.info('Not enough values stored to check threshold')
-          threshold_result = False
+      threshold_result = self._eval_helper(sensor_action['threshold'],
+              sensor_data['sensor_data'],
+              self.action_status.get_values(action_status_id_hex))
 
-      self.action_status.update_values(action_status_id_hex, sensor_config['value_count'], sensor_data['sensor_data'])
+      self.action_status.update_values(action_status_id_hex,
+              sensor_config['value_count'],
+              sensor_data['sensor_data'])
 
       if not threshold_result:
         continue
@@ -287,7 +289,15 @@ class Mgw(mqtt.Mqtt):
         LOG.error("Fail to format message '%s' with data '%s'", sensor_action['message_template'], sensor_data)
         continue
 
-      if sensor_action.should_check_if_armed(sensor_data['board_id']) and not self.status.get('armed'):
+      check_status = True
+      for status_name in sensor_action['check_status']:
+        check_status = self._eval_helper(sensor_action['check_status'][status_name],
+                self.status.get(status_name),
+                [])
+        if not check_status:
+          break
+
+      if not check_status:
         continue
 
       if not self.action_status.check_failed_count(action_status_id_hex,

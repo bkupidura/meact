@@ -56,12 +56,8 @@ def validate_sensor_config(data):
             'actions': {'required': True, 'type': 'list', 'schema':
               {'type': 'dict', 'schema':
                 {'action_interval': {'required': True, 'type': 'integer', 'min': 0},
-                 'check_if_armed': {'required': True, 'type': 'dict', 'schema': {
-                   'default': {'required': True, 'anyof':
-                     [{'type': 'integer', 'min': 0, 'max': 1},
-                      {'type': 'boolean'}]},
-                       'except': {'required': True, 'type': 'list', 'schema':
-                        {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}}},
+                 'check_status': {'required': True, 'type': 'dict', 'valueschema':
+                   {'required': True, 'empty': False, 'type': 'string'}},
                  'action': {'required': True, 'type': 'list', 'schema':
                    {'isaction': True, 'type': 'dict'},
                     'noneof': [{'type': 'list', 'items': []}]},
