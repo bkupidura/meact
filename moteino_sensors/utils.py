@@ -26,12 +26,12 @@ def load_config(config_name):
 
 class ActionValidator(Validator):
   def _validate_action(self, field, value):
-      if not isinstance(value.get('name'), cerberus._str_type):
-        self._error(field, "Must be action")
-      failback = value.get('failback')
-      if failback:
-        for f in failback:
-          self._validate_action(field, f)
+    if not isinstance(value.get('name'), cerberus._str_type):
+      self._error(field, "Must be action")
+    failback = value.get('failback')
+    if failback:
+      for f in failback:
+        self._validate_action(field, f)
 
   def _validate_isaction(self, isaction, field, value):
     if isaction:
@@ -44,33 +44,40 @@ def validate_sensor_data(data):
             'sensor_type': {'required': True, 'empty': False, 'type': 'string'},
             'sensor_data': {'required': True, 'empty': False, 'type': 'string'}}
   v = Validator()
-  return v.validate(data, schema)
+  validation = v.validate(data, schema)
+  if v.errors:
+    LOG.warning('Sensor_data validation failed: %s', v.errors)
+  return validation
 
 
 def validate_sensor_config(data):
-  schema = {'action_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'check_if_armed': {'required': True, 'type': 'dict', 'schema': {
-                'default': {'required': True, 'anyof':
-                    [{'type': 'integer', 'min': 0, 'max': 1},
-                     {'type': 'boolean'}]},
-                'except': {'required': True, 'type': 'list', 'schema':
-                    {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}}},
-            'action': {'required': True, 'type': 'list', 'schema':
-                {'isaction': True, 'type': 'dict'},
-                'noneof': [{'type': 'list', 'items': []}]},
-            'threshold': {'required': True, 'empty': False, 'type': 'string'},
-            'fail_count': {'required': True, 'type': 'integer', 'min': 0},
-            'message_template': {'required': True, 'empty': False, 'type': 'string'},
-            'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
-            'id': {'required': True, 'type': 'string', 'empty': False},
-            'action_config': {'required': True, 'type': 'dict', 'valueschema':
-                {'type': 'dict'}},
-            'board_ids': {'required': True, 'type': 'list', 'schema':
-                {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}},
-            'value_count': {'required': True, 'type': 'integer', 'min': 0}
-            }
+  schema = {'priority': {'required': True, 'type': 'integer', 'min': 0},
+            'value_count': {'required': True, 'type': 'integer', 'min': 0},
+            'actions': {'required': True, 'type': 'list', 'schema':
+              {'type': 'dict', 'schema':
+                {'action_interval': {'required': True, 'type': 'integer', 'min': 0},
+                 'check_if_armed': {'required': True, 'type': 'dict', 'schema': {
+                   'default': {'required': True, 'anyof':
+                     [{'type': 'integer', 'min': 0, 'max': 1},
+                      {'type': 'boolean'}]},
+                       'except': {'required': True, 'type': 'list', 'schema':
+                        {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}}},
+                 'action': {'required': True, 'type': 'list', 'schema':
+                   {'isaction': True, 'type': 'dict'},
+                    'noneof': [{'type': 'list', 'items': []}]},
+                 'threshold': {'required': True, 'empty': False, 'type': 'string'},
+                 'fail_count': {'required': True, 'type': 'integer', 'min': 0},
+                 'message_template': {'required': True, 'empty': False, 'type': 'string'},
+                 'fail_interval': {'required': True, 'type': 'integer', 'min': 0},
+                 'id': {'required': True, 'type': 'string', 'empty': False},
+                 'action_config': {'required': True, 'type': 'dict', 'valueschema': {'type': 'dict'}},
+                 'board_ids': {'required': True, 'type': 'list', 'schema': {'empty': False, 'type': 'string', 'regex': '^[a-zA-Z0-9]+$'}}}},
+                'noneof': [{'type': 'list', 'items': []}]}}
   v = ActionValidator()
-  return v.validate(data, schema)
+  validation = v.validate(data, schema)
+  if v.errors:
+    LOG.warning('Sensor_config validation failed: %s', v.errors)
+  return validation
 
 
 def create_logger(conf=None):
