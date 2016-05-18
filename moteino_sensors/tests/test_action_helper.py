@@ -18,7 +18,6 @@ default_sensor_config = {
     'threshold': 'lambda x: True',
     'fail_count': 0,
     'fail_interval': 0,
-    'id': 'abc',
     'message_template': 'Template message for {board_id}',
     'action': [{'name': 'action'}],
     'action_config': {'action_name': {'test': 10}},
@@ -74,7 +73,7 @@ def test_should_check_status(check_status, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['check_status'] = check_status
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -110,7 +109,7 @@ def test_actions(check_actions, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'] = check_actions
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -146,10 +145,9 @@ def test_config_for_board(board_ids, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['board_ids'] = board_ids
 
-  ada = gateway.SensorConfigAdapter(sensor_config)
-  ada.build_defaults()
+  ada = gateway.SensorActionAdapter(sensor_config['actions'][0])
 
-  assert ada['actions'][0].action_for_board(board_id) == expected
+  assert ada.action_for_board(board_id) == expected
 
 board_ids_test_data = (
   (
@@ -203,7 +201,7 @@ def test_board_ids(board_ids, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['board_ids'] = board_ids
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -243,7 +241,7 @@ def test_action_config(action_config, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['action_config'] = action_config
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -291,7 +289,7 @@ def test_action_interval(action_interval, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['action_interval'] = action_interval
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -300,7 +298,7 @@ def test_fail_count(fail_count, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['fail_count'] = fail_count
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -309,7 +307,7 @@ def test_fail_interval(fail_interval, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['fail_interval'] = fail_interval
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -318,7 +316,7 @@ def test_priority(priority, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['priority'] = priority
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -327,7 +325,7 @@ def test_value_count(value_count, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['value_count'] = value_count
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
   assert ada == expected
 
@@ -374,142 +372,23 @@ not_empty_string_test_data = (
   ),
 )
 
-@pytest.mark.parametrize('index, expected', not_empty_string_test_data)
-def test_index(index, expected):
-  sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['actions'][0]['id'] = index
-
-  ada = utils.validate_sensor_config(sensor_config)
-
-  assert ada == expected
-
 @pytest.mark.parametrize('threshold, expected', not_empty_string_test_data)
 def test_threshold(threshold, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['threshold'] = threshold
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
+
+  assert ada == expected
 
 @pytest.mark.parametrize('message_template, expected', not_empty_string_test_data)
 def test_message_template(message_template, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['message_template'] = message_template
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
 
-boolean_integer_test_data = (
-  (
-    True,
-    True
-  ),
-  (
-    False,
-    True
-  ),
-  (
-    0,
-    True
-  ),
-  (
-    1,
-    True
-  ),
-  (
-    10,
-    False
-  ),
-  (
-    -10,
-    False
-  ),
-  (
-    [],
-    False
-  ),
-  (
-    [1, ],
-    False
-  ),
-  (
-    {},
-    False
-  ),
-  (
-    {'test': 10},
-    False
-  ),
-  (
-    None,
-    False
-  ),
-)
-
-check_if_armed_except_test_data = (
-  (
-    [],
-    True
-  ),
-  (
-    ['test'],
-    True
-  ),
-  (
-    ['10', '20'],
-    True
-  ),
-  (
-    10,
-    False
-  ),
-  (
-    [10],
-    False
-  ),
-  (
-    [1, ],
-    False
-  ),
-  (
-    {},
-    False
-  ),
-  (
-    [{}],
-    False
-  ),
-  (
-    {'test': 10},
-    False
-  ),
-  (
-    [{'test': 10}],
-    False
-  ),
-  (
-    None,
-    False
-  ),
-  (
-    [None],
-    False
-  ),
-  (
-    True,
-    False
-  ),
-  (
-    [True],
-    False
-  ),
-  (
-    False,
-    False
-  ),
-  (
-    [False],
-    False
-  ),
-)
+  assert ada == expected
 
 action_test_data = (
   (
@@ -611,4 +490,48 @@ def test_action(action, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['action'] = action
 
-  ada = utils.validate_sensor_config(sensor_config)
+  ada, data = utils.validate_sensor_config(sensor_config)
+
+  assert ada == expected
+
+default_test_data = (
+  (
+    {
+      'actions': [
+        {
+          'action': [
+            {'name': 'test'}
+          ]
+        }
+      ]
+    },
+    {
+      "priority": 500,
+      "value_count": 0,
+      "actions": [
+        {
+          "action_interval": 0,
+          "check_status": {},
+          "threshold": "lambda: True",
+          "fail_count": 0,
+          "fail_interval": 600,
+          "message_template": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}",
+          "action_config": {},
+          "board_ids": [],
+          "action": [
+            {"name": "test"}
+          ]
+        }
+      ]
+    }
+  ),
+)
+
+@pytest.mark.parametrize('default, expected', default_test_data)
+def test_default_values(default, expected):
+  sensor_config = default
+
+  ada, data = utils.validate_sensor_config(sensor_config)
+
+  assert ada == True
+  assert data == expected

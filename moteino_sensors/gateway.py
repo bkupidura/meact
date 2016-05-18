@@ -16,16 +16,8 @@ from moteino_sensors import utils
 class SensorActionAdapter(dict):
   """Adapter for sensor action from SensorConfig
   """
-  def build_defaults(self):
-    self.setdefault('check_status', {})
-    self.setdefault('action_interval', 0)
-    self.setdefault('threshold', 'lambda: True')
-    self.setdefault('fail_count', 0)
-    self.setdefault('fail_interval', 600)
-    self.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-    self.setdefault('action_config', {})
-    self.setdefault('board_ids', [])
-
+  def __init__(self, *args, **kwargs):
+    super(SensorActionAdapter, self).__init__(*args, **kwargs)
     self_as_str = json.dumps(self)
     self['id'] = hashlib.md5(self_as_str).hexdigest()
 
@@ -35,23 +27,6 @@ class SensorActionAdapter(dict):
     elif not self['board_ids']:
       return True
     return False
-
-
-class SensorConfigAdapter(dict):
-  """Adapter for sensor config
-
-  Provides helpers and functions that allows
-  to easily work on sensor config
-  """
-  def build_defaults(self):
-    self.setdefault('priority', 500)
-    self.setdefault('value_count', 0)
-    self.setdefault('actions', [])
-
-    for idx, action in enumerate(self['actions']):
-      sensor_action = SensorActionAdapter(action)
-      sensor_action.build_defaults()
-      self['actions'][idx] = sensor_action
 
 
 class ActionStatusAdapter(dict):
@@ -144,12 +119,11 @@ class Mgw(mqtt.Mqtt):
 
     for sensor_type in sensors_map:
       sensor_config = sensors_map[sensor_type]
-      sensor_config = SensorConfigAdapter(sensor_config)
-      sensor_config.build_defaults()
+      validation_result, sensor_config = utils.validate_sensor_config(sensor_config)
 
-      if not utils.validate_sensor_config(sensor_config):
-        LOG.warning("Fail to validate data '%s', ignoring..", sensor_type)
-      else:
+      if validation_result:
+        for idx, action in enumerate(sensor_config['actions']):
+          sensor_config['actions'][idx] = SensorActionAdapter(action)
         self.sensors_map[sensor_type] = sensor_config
 
   def _get_boards(self, db):
@@ -178,8 +152,8 @@ class Mgw(mqtt.Mqtt):
     return sensor_data, sensor_config
 
   def _prepare_sensor_data(self, sensor_data):
-    if not utils.validate_sensor_data(sensor_data):
-      LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
+    validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
+    if not validation_result:
       return None
 
     board_id = sensor_data['board_id']

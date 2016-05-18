@@ -6,6 +6,6 @@ requests
 urllib3
 python-gsmmodem
 paho-mqtt
-cerberus
 sqlalchemy
 tornado
+jsonschema

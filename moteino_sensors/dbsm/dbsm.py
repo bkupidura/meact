@@ -31,8 +31,8 @@ class Dbsm(mqtt.Mqtt):
       self.metric_queue.put(sensor_data)
 
   def _prepare_sensor_data(self, sensor_data):
-    if not utils.validate_sensor_data(sensor_data):
-      LOG.warning("Fail to validate data '%s', ignoring..", sensor_data)
+    validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
+    if not validation_result:
       return None
 
     return sensor_data

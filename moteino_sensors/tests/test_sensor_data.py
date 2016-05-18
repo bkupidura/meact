@@ -60,7 +60,7 @@ def test_board_id(board_id, expected):
   metric = copy.deepcopy(default_metric)
   metric['board_id'] = board_id
 
-  ada = utils.validate_sensor_data(metric)
+  ada, data = utils.validate_sensor_data(metric)
 
   assert ada == expected
 
@@ -69,7 +69,7 @@ def test_sensor_type(sensor_type, expected):
   metric = copy.deepcopy(default_metric)
   metric['sensor_type'] = sensor_type
 
-  ada = utils.validate_sensor_data(metric)
+  ada, data = utils.validate_sensor_data(metric)
 
   assert ada == expected
 
@@ -78,6 +78,6 @@ def test_sensor_data(sensor_data, expected):
   metric = copy.deepcopy(default_metric)
   metric['sensor_data'] = sensor_data
 
-  ada = utils.validate_sensor_data(metric)
+  ada, data = utils.validate_sensor_data(metric)
 
   assert ada == expected
