@@ -92,7 +92,7 @@
                 refreshTimer = setInterval(refreshTab, 1000*60, this);
 
                 if (href == '#status'){
-                    $.getJSON(api_endpoint + '/action/status').done(function(data){
+                    $.getJSON(api_endpoint + '/status').done(function(data){
                         var status_html = ''
                         for (var k in status_mapping){
                             var source = $(href + k + 'Template').html();

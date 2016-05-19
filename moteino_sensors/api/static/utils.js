@@ -15,7 +15,7 @@ function invertStatus(status_name, value){
         if (result){
             var data = {};
             data[status_name] = value;
-            $.postJSON(api_endpoint + '/action/status', JSON.stringify(data));
+            $.postJSON(api_endpoint + '/status', JSON.stringify(data));
             setTimeout(refreshTab(document.getElementById('status-tab')), 500);
         }
     });
@@ -93,7 +93,7 @@ function sendCommand(name, command, board, mqtt_topic){
     bootbox.confirm(msg, function(result){
         if (result){
             mqtt_msg = {'topic': mqtt_topic, 'data': command};
-            $.postJSON(api_endpoint + '/action/mqtt', JSON.stringify(mqtt_msg));
+            $.postJSON(api_endpoint + '/mqtt', JSON.stringify(mqtt_msg));
         }
     });
     return false;

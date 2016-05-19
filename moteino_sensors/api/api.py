@@ -44,19 +44,7 @@ def static(filepath):
   return static_content
 
 
-@app.route('/api/action/status')
-def get_action_status():
-  return app.config['mqtt'].status
-
-
-@app.route('/api/action/status', method=['POST'])
-def set_action_status():
-  data = bottle.request.json
-  if data:
-    app.config['mqtt'].publish_status(data)
-
-
-@app.route('/api/action/mqtt', method=['POST'])
+@app.route('/api/mqtt', method=['POST'])
 def set_action_mqtt():
   if (bottle.request.json):
     topic = bottle.request.json.get('topic')
@@ -66,10 +54,22 @@ def set_action_mqtt():
       app.config['mqtt'].publish(topic, data, retain)
 
 
+@app.route('/api/status', method=['GET'])
+def get_action_status():
+  return app.config['mqtt'].status
+
+
+@app.route('/api/status', method=['POST'])
+def set_action_status():
+  data = bottle.request.json
+  if data:
+    app.config['mqtt'].publish_status(data)
+
+
 @app.route('/api/node', method=['GET', 'POST'])
 @app.route('/api/node/', method=['GET', 'POST'])
 @app.route('/api/node/<board_id>', method=['GET', 'POST'])
-def get_nodes(board_id=None):
+def get_nodes(board_id = None):
   start = None
   end = None
 
@@ -101,7 +101,7 @@ def get_nodes(board_id=None):
 
 
 @app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
-def get_graph(graph_type=None):
+def get_graph(graph_type = None):
   now = int(time.time())
   start = now - 60 * 60 * 24
   end = now
