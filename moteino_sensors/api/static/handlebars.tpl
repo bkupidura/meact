@@ -9,28 +9,30 @@
     Board: {{name}}<br />
     Offline
 </script>
+<script id="nodeOfflineTemplate" type="x-handlebars-template">
+    <h3>Nodes</h3>
+    {{#each this}}
+        <h4>
+            <button class="btn btn-danger btn-xs disabled">
+                {{desc}} ({{name}})
+            </button>
+        </h4>
+    {{/each}}
+</script>
 <script id="nodeTemplate" type="x-handlebars-template">
     <h3>Nodes</h3>
     {{#each this}}
-        {{#if data}}
-            <h4>
-                <button class="btn btn-primary btn-xs" onclick="showCommandDialog('{{name}}')">
-                    {{desc}} ({{name}})
-                </button>
-            </h4>
-            <h5>
-                <span class="label label-default">seen: {{UpdateToSec last_update}}</span>&nbsp;
-                {{#data}}
-                    <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
-                {{/data}}
-            </h5>
-        {{else}}
-            <h4>
-                <button class="btn btn-danger btn-xs disabled">
-                    {{desc}} ({{name}})
-                </button>
-            </h4>
-        {{/if}}
+        <h4>
+            <button class="btn btn-primary btn-xs" onclick="showCommandDialog('{{name}}')">
+                {{desc}} ({{name}})
+            </button>
+        </h4>
+        <h5>
+            <span class="label label-default">seen: {{UpdateToSec last_update}}</span>&nbsp;
+            {{#data}}
+                <span class="label label-info">{{0}}: {{1}}</span>&nbsp;
+            {{/data}}
+        </h5>
     {{/each}}
 </script>
 <script id="statusServiceTemplate" type="x-handlebars-template">

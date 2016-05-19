@@ -70,9 +70,8 @@ def set_action_mqtt():
 @app.route('/api/node/', method=['GET', 'POST'])
 @app.route('/api/node/<board_id>', method=['GET', 'POST'])
 def get_nodes(board_id=None):
-  now = int(time.time())
-  start = now - 60 * 60 * 1
-  end = now
+  start = None
+  end = None
 
   if (bottle.request.json):
     start = bottle.request.json.get('start', start)
@@ -86,12 +85,14 @@ def get_nodes(board_id=None):
   last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end)
 
   output = dict()
-  for metric in last_metrics:
-    output.setdefault(metric.board_id, {'name': metric.board_id,
-      'desc': board_desc[metric.board_id],
+  for board in board_ids:
+    output.setdefault(board, {'name': board,
+      'desc': board_desc[board],
       'data': [],
       'last_update': 0
     })
+
+  for metric in last_metrics:
     output[metric.board_id]['data'].append((metric.sensor_type, metric.sensor_data))
     if output[metric.board_id]['last_update'] < metric.last_update:
       output[metric.board_id]['last_update'] = metric.last_update

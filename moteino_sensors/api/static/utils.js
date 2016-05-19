@@ -214,3 +214,7 @@ function generate_menu(type, mapping){
         menu.appendChild(li);
     }
 }
+function last_seen(last_update){
+    var now = new Date() / 1000;
+    return parseInt(now - last_update);
+}

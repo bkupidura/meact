@@ -72,9 +72,8 @@
             $("body").append(data);
         });
 
-        Handlebars.registerHelper('UpdateToSec', function(last_update) {
-            var now = new Date() / 1000;
-            return parseInt(now - last_update);
+        Handlebars.registerHelper('UpdateToSec', function(last_update){
+            return last_seen(last_update)
         });
     </script>
     <script>
@@ -106,53 +105,64 @@
                         $(href).html(status_html);
                     });
                 } else if (href == '#node'){
-                    $.getJSON(api_endpoint + '/node').done(function(data){
+                    var start_date = (new Date() / 1000) - 60*60;
+                    var params = JSON.stringify({"start": start_date});
+                    $.postJSON(api_endpoint + '/node', params).done(function(data){
                         var node_type = $(ev.target).text();
                         var nodes = [];
-                        var node_html = '';
 
+                        if (node_type == 'Offline'){
+                            var source = $(href + 'OfflineTemplate').html();
+                        } else {
+                            var source = $(href + 'Template').html();
+                        }
                         for (var k in data){
-                            if (node_type == 'Offline' && data[k]['data'].length == 0){
-                                nodes.push(data[k]);
-                            } else if (data[k]['data'].length){
-                                if (node_mapping[node_type].indexOf(data[k]['name']) >= 0){
+                            if (node_type == 'Offline'){
+                                if (last_seen(data[k]['last_update']) > config['node_offline']['time'] &&
+                                    config['node_offline']['ignore'].indexOf(data[k]['name']) < 0){
+                                    nodes.push(data[k]);
+                                }
+                            } else if (node_mapping[node_type].indexOf(data[k]['name']) >= 0){
+                                if (last_seen(data[k]['last_update']) < config['node_offline']['time']){
                                     nodes.push(data[k]);
                                 }
                             }
                         }
-
-                        var source = $(href + 'Template').html();
                         var template = Handlebars.compile(source);
 
-                        node_html += template(nodes);
+                        var node_html = template(nodes);
 
                         $(href).html(node_html);
                     });
                 } else if (href == '#map'){
-                    $.getJSON(api_endpoint + '/node').done(function(data){
+                    start_date = (new Date() / 1000) - 60*60;
+                    params = JSON.stringify({"start": start_date});
+                    $.postJSON(api_endpoint + '/node', params).done(function(data){
                         var svg_map = document.getElementById("svg-map").contentDocument;
                         d3.selectAll(".d3-tip").remove();
                         for (var k in data){
                             var svg_board = d3.select(svg_map).select("#board-" + data[k]['name']);
-                            var tip = d3.tip()
-                                .attr('class', 'd3-tip')
-                                .offset([120, 15])
-                                .direction('n')
+                            if (!svg_board.empty()) {
+                                var tip = d3.tip()
+                                    .attr('class', 'd3-tip')
+                                    .offset([120, 15])
+                                    .direction('n')
 
-                            if (data[k]['data'].length){
-                                svg_board.attr("fill", "#008000");
-                                var source = $('#mapOnlineTemplate').html();
-                                var template = Handlebars.compile(source);
-                            } else {
-                                var source = $('#mapOfflineTemplate').html();
-                                var template = Handlebars.compile(source);
-                                svg_board.attr("fill", "#FF0000");
+                                if (last_seen(data[k]['last_update']) < config['node_offline']['time']){
+                                    svg_board.attr("fill", "#008000");
+                                    var source = $('#mapOnlineTemplate').html();
+                                    var template = Handlebars.compile(source);
+                                } else {
+                                    var source = $('#mapOfflineTemplate').html();
+                                    var template = Handlebars.compile(source);
+                                    svg_board.attr("fill", "#FF0000");
+                                }
+
+                                tip.html(template(data[k]));
+                                svg_board.call(tip);
+                                svg_board.on('mouseover', tip.show);
+                                svg_board.on('mouseout', tip.hide);
                             }
-
-                            tip.html(template(data[k]));
-                            svg_board.call(tip);
-                            svg_board.on('mouseover', tip.show);
-                            svg_board.on('mouseout', tip.hide);
                         }
                     });
                 } else if (href == '#graph'){
