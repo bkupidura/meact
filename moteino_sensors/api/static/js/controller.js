@@ -1,27 +1,51 @@
 var dashboardControllers = angular.module('dashboardControllers', []);
 
-dashboardControllers.controller('StatusCtrl', ['$scope', '$http', '$interval', 'StatusService',
-  function ($scope, $http, $interval, StatusService) {
-      
+dashboardControllers.controller('StatusCtrl', ['$scope', '$interval', 'dashboardConfig', 'StatusService',
+  function ($scope, $interval, dashboardConfig, StatusService) {
+
+    $scope.timers = Array();
+
     updateStatus = function(){
       StatusService.getStatus().then(function(data) {
-        $scope.status = data['data'];
+        $scope.status = Array();
+        angular.forEach(data['data'], function(status_value, status_name){
+          angular.forEach(dashboardConfig['status'], function(type_value , type_name){
+            if (type_value.indexOf(status_name) !== -1){
+              $scope.status.push({
+                'name': status_name,
+                'value': status_value,
+                'type': type_name
+              });
+            }
+          });
+        });
+      });
+    }
+    $scope.changeStatus = function(name){
+      angular.forEach($scope.status, function(status_value, status_index){
+        if (status_value['name'] == name){
+            $scope.status[status_index]['value'] ^= 1;
+            StatusService.setStatus(name, $scope.status[status_index]['value']);
+        }
       });
     }
 
     updateStatus();
-    $interval(updateStatus, 1000*60);
 
-    $scope.changeStatus = function(name){
-      $scope.status[name] ^= 1;
-      StatusService.setStatus(name, $scope.status[name]);
-    }
+    $scope.timers.push($interval(updateStatus, 1000*60))
+
+    $scope.$on("$destroy", function(){
+      angular.forEach($scope.timers, function(value, key){
+        $interval.cancel(value);
+      });
+    });
 
   }]);
 
-dashboardControllers.controller('BoardCtrl', ['$scope', '$http', '$interval', '$filter', '$uibModal', 'dashboardConfig', 'BoardService', 'defaults',
-  function ($scope, $http, $interval, $filter, $uibModal, dashboardConfig, BoardService, defaults) {
+dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', '$uibModal', 'dashboardConfig', 'BoardService', 'defaults',
+  function ($scope, $interval, $filter, $uibModal, dashboardConfig, BoardService, defaults) {
 
+    $scope.timers = Array();
     $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
     $scope.offline_timeout = dashboardConfig.offline_timeout;
@@ -38,13 +62,6 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$http', '$interval', '$
         $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout);
       });
     }
-
-    updateBoards();
-    updateBoardsOffline();
-
-    $interval(updateBoards, 1000*60);
-    $interval(updateBoardsOffline, 1000*60);
-
     function getCommands(boardID) {
       if (boardID in $scope.commands) {
         return $scope.commands[boardID];
@@ -52,7 +69,6 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$http', '$interval', '$
         return $scope.commands['default'];
       }
     }
-
     $scope.actionOpen = function(boardID){
       var modalInstance = $uibModal.open({
         animation: true,
@@ -70,9 +86,21 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$http', '$interval', '$
       });
     }
 
+    updateBoards();
+    updateBoardsOffline();
+
+    $scope.timers.push($interval(updateBoards, 1000*60));
+    $scope.timers.push($interval(updateBoardsOffline, 1000*60));
+
+    $scope.$on("$destroy", function(){
+      angular.forEach($scope.timers, function(value, key){
+        $interval.cancel(value);
+      });
+    });
   }]);
 
 dashboardControllers.controller('ActionModalCtrl', function ($scope, $uibModalInstance, MQTTService, commands, boardID) {
+
   $scope.boardID = boardID;
   $scope.commands = commands;
 
@@ -83,8 +111,10 @@ dashboardControllers.controller('ActionModalCtrl', function ($scope, $uibModalIn
   }
 });
 
-dashboardControllers.controller('MapCtrl', ['$scope', '$http', '$interval', '$filter', '$timeout', 'dashboardConfig', 'BoardService', 'defaults',
-  function ($scope, $http, $interval, $filter, $timeout, dashboardConfig, BoardService, defaults) {
+dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$uibModal', 'dashboardConfig', 'BoardService', 'defaults',
+  function ($scope, $interval, $filter, $uibModal, dashboardConfig, BoardService, defaults) {
+
+    $scope.timers = Array();
     $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
     $scope.offline_timeout = dashboardConfig.offline_timeout;
@@ -100,15 +130,27 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$http', '$interval', '$fi
         $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout);
       });
     }
+    boardOpen = function(board){
+      var modalInstance = $uibModal.open({
+        animation: true,
+        templateUrl: 'BoardDetail',
+        controller: 'MapModalCtrl',
+        size: 'sm',
+        resolve: {
+          board: function() {
+            return board;
+          }
+        }
+      });
+    }
     updateMap = function(){
       svg_map = d3.select('#svg-map');
       angular.forEach($scope.boards, function(value, key){
         svg_board = svg_map.select("#board-" + value['name']);
+        svg_board.on('click', function(){
+          boardOpen(value);
+        })
         svg_board.attr('fill', '#008000');
-        svg_board.attr('uib-popover-template', "\"'BoardDetail'\"");
-        svg_board.attr('popover-trigger', 'mouseenter');
-        svg_board.attr('popover-placement', 'auto top');
-        svg_board.attr('popover-title', 'Details');
       });
       angular.forEach($scope.boards_offline, function(value, key){
         svg_map.select("#board-" + value['name']).attr('fill', '#FF0000');
@@ -121,8 +163,17 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$http', '$interval', '$fi
     $scope.$watch('boards', updateMap);
     $scope.$watch('boards_offline', updateMap);
 
-    $interval(updateBoards, 1000*60);
-    $interval(updateBoardsOffline, 1000*60);
+    $scope.timers.push($interval(updateBoards, 1000*60));
+    $scope.timers.push($interval(updateBoardsOffline, 1000*60));
+
+    $scope.$on("$destroy", function(){
+      angular.forEach($scope.timers, function(value, key){
+        $interval.cancel(value);
+      });
+    });
 
   }]);
 
+dashboardControllers.controller('MapModalCtrl', function ($scope, board) {
+  $scope.board = board;
+});

@@ -1,18 +1,26 @@
-body {
-  padding-top: 50px;
-}
 .starter-template {
-  padding: 40px 15px;
+  padding-top: 80px;
+  padding-left: 10px;
 }
 .status-wrapper{
+  padding-left: 10px;
   width: 20%;
   display: block;
 }
 .board-wrapper{
+  padding-top: 20px;
+  padding-left: 10px;
+  width: 40%;
+  display: block;
+}
+.map-wrapper{
   width: 40%;
   display: block;
 }
 .board-search{
+  padding-left: 10px;
+}
+.modal-body-map{
   padding-left: 10px;
 }
 .margin {

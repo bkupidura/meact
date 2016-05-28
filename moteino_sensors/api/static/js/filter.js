@@ -30,3 +30,18 @@ angular.module('dashboardApp').filter('LastUpdate', function() {
     return parseInt(now - last_update);
   }
 });
+
+angular.module('dashboardApp').filter('MetricUnit', function() {
+  return function(metric_value, metric_type){
+    switch (metric_type) {
+      case 'voltage':
+        return metric_value + ' V';
+      case 'seen':
+        return metric_value + ' seconds ago';
+      case 'temperature':
+        return metric_value + ' \u00B0C';
+      default:
+        return metric_value;
+    }
+  }
+});
