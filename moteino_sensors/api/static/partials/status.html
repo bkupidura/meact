@@ -1,0 +1,9 @@
+<div class="status-wrapper" ng-repeat="(status_key, status_value) in status">
+  <div class="col-sm-4 margin">{{status_key}}</div>
+    <div class="col-sm-8 margin">
+      <div class="btn-group">
+          <label class="btn btn-primary btn-xs" ng-model="radioModel" ng-click="changeStatus(status_key)" ng-class="{active: status_value == 1}">Enabled</label>
+        <label class="btn btn-primary btn-xs" ng-model="radioModel" ng-click="changeStatus(status_key)" ng-class="{active: status_value == 0}">Disabled</label>
+      </div>
+    </div>
+</div>

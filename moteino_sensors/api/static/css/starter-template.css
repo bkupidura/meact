@@ -1,0 +1,21 @@
+body {
+  padding-top: 50px;
+}
+.starter-template {
+  padding: 40px 15px;
+}
+.status-wrapper{
+  width: 20%;
+  display: block;
+}
+.board-wrapper{
+  width: 40%;
+  display: block;
+}
+.board-search{
+  padding-left: 10px;
+}
+.margin {
+  margin-top: 5px;
+  margin-bottom: 5px;
+}

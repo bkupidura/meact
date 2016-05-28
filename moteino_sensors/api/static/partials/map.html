@@ -1,0 +1,10 @@
+<script type="text/ng-template" id="BoardDetail">
+  <div>
+    <span ng-repeat="(data_key, data_value) in board['data']">
+      {{data_key}}: {{data_value}}<br />
+    </span>
+    seen: {{board['last_update'] | LastUpdate}}
+  </div>
+</script>
+
+<div id="svg-map" ng-include="'map.svg'"></div> 

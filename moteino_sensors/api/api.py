@@ -45,7 +45,7 @@ def static(filepath):
 
 
 @app.route('/api/mqtt', method=['POST'])
-def set_action_mqtt():
+def publish_mqtt():
   if (bottle.request.json):
     topic = bottle.request.json.get('topic')
     data = bottle.request.json.get('data')
@@ -55,21 +55,21 @@ def set_action_mqtt():
 
 
 @app.route('/api/status', method=['GET'])
-def get_action_status():
+def get_status():
   return app.config['mqtt'].status
 
 
 @app.route('/api/status', method=['POST'])
-def set_action_status():
+def set_status():
   data = bottle.request.json
   if data:
     app.config['mqtt'].publish_status(data)
 
 
-@app.route('/api/node', method=['GET', 'POST'])
-@app.route('/api/node/', method=['GET', 'POST'])
-@app.route('/api/node/<board_id>', method=['GET', 'POST'])
-def get_nodes(board_id = None):
+@app.route('/api/board', method=['GET', 'POST'])
+@app.route('/api/board/', method=['GET', 'POST'])
+@app.route('/api/board/<board_id>', method=['GET', 'POST'])
+def get_board(board_id = None):
   start = None
   end = None
 
@@ -85,15 +85,14 @@ def get_nodes(board_id = None):
   last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end)
 
   output = dict()
-  for board in board_ids:
-    output.setdefault(board, {'name': board,
-      'desc': board_desc[board],
-      'data': [],
-      'last_update': 0
-    })
 
   for metric in last_metrics:
-    output[metric.board_id]['data'].append((metric.sensor_type, metric.sensor_data))
+    output.setdefault(metric.board_id, {'name': metric.board_id,
+        'desc': board_desc[metric.board_id],
+        'data': {},
+        'last_update': 0
+    })
+    output[metric.board_id]['data'][metric.sensor_type] = metric.sensor_data
     if output[metric.board_id]['last_update'] < metric.last_update:
       output[metric.board_id]['last_update'] = metric.last_update
 
