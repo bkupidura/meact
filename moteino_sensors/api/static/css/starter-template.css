@@ -17,6 +17,11 @@
   width: 40%;
   display: block;
 }
+.graph-wrapper{
+  padding-left: 10px;
+  width: 100%;
+  display: block;
+}
 .board-search{
   padding-left: 10px;
 }

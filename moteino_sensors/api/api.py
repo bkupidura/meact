@@ -105,15 +105,16 @@ def get_graph(graph_type = None):
   start = now - 60 * 60 * 24
   end = now
   last_available = 0
+  board_ids = None
 
   if (bottle.request.json):
     start = bottle.request.json.get('start', start)
     end = bottle.request.json.get('end', end)
     last_available = bottle.request.json.get('last_available', last_available)
+    board_ids = bottle.request.json.get('board_ids', board_ids)
 
   boards = database.get_boards(app.config['db'])
 
-  board_ids = [board.board_id for board in boards]
   board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
   last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, sensor_type=graph_type)
@@ -128,7 +129,7 @@ def get_graph(graph_type = None):
       metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, last_available=last_available)
 
     for metric in metrics:
-      data = ((metric.last_update * 1000), float(metric.sensor_data))
+      data = (metric.last_update*1000, float(metric.sensor_data))
       output[-1]['data'].append(data)
 
   return json.dumps(output)

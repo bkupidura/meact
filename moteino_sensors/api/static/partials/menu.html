@@ -8,5 +8,11 @@
     <li role="presentation"><a href='#status' data-toggle="tab">Status</a></li>
     <li role="presentation"><a href='#board' data-toggle="tab">Board</a></li>
     <li role="presentation"><a href='#map' data-toggle="tab">Map</a></li>
+    <li role="presentation" uib-dropdown>
+      <a href class="dropdown-toggle" uib-dropdown-toggle>Graph<span class="caret"></span></a>
+      <ul class="dropdown-menu" uib-dropdown-menu aria-labelledby="simple-dropdown">
+        <li ng-repeat="(graph_name, graph_params) in graphs"><a href="#graph/{{graph_name}}">{{graph_name}}</a></li>
+      </ul>
+    </li>
 </ul>
 </div>

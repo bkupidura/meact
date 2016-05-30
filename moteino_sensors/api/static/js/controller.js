@@ -1,5 +1,10 @@
 var dashboardControllers = angular.module('dashboardControllers', []);
 
+dashboardControllers.controller('MenuCtrl', ['$scope', 'dashboardConfig',
+  function ($scope, dashboardConfig){
+    $scope.graphs = dashboardConfig['graphs'];
+  }]);
+
 dashboardControllers.controller('StatusCtrl', ['$scope', '$interval', 'dashboardConfig', 'StatusService',
   function ($scope, $interval, dashboardConfig, StatusService) {
 
@@ -52,7 +57,7 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', 
     $scope.commands = dashboardConfig.commands;
 
     updateBoards = function(){
-      now = new Date() / 1000;
+      var now = new Date() / 1000;
       BoardService.getBoard(start_time = now - $scope.offline_timeout).then(function(data){
         $scope.boards = data['data'];
       });
@@ -105,7 +110,7 @@ dashboardControllers.controller('ActionModalCtrl', function ($scope, $uibModalIn
   $scope.commands = commands;
 
   $scope.sendCommand = function(boardID, command){
-    cmd = sprintf(command['command'], {board: boardID});
+    var cmd = sprintf(command['command'], {board: boardID});
     MQTTService.publish(data = cmd, topic = command['mqtt_topic'], retain = false);
     $uibModalInstance.close();
   }
@@ -120,7 +125,7 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
     $scope.offline_timeout = dashboardConfig.offline_timeout;
 
     updateBoards = function(){
-      now = new Date() / 1000;
+      var now = new Date() / 1000;
       BoardService.getBoard(start_time = now - $scope.offline_timeout).then(function(data){
         $scope.boards = data['data'];
       });
@@ -144,9 +149,9 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
       });
     }
     updateMap = function(){
-      svg_map = d3.select('#svg-map');
+      var svg_map = d3.select('#svg-map');
       angular.forEach($scope.boards, function(value, key){
-        svg_board = svg_map.select("#board-" + value['name']);
+        var svg_board = svg_map.select("#board-" + value['name']);
         svg_board.on('click', function(){
           boardOpen(value);
         })
@@ -177,3 +182,101 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
 dashboardControllers.controller('MapModalCtrl', function ($scope, board) {
   $scope.board = board;
 });
+
+dashboardControllers.controller('GraphCtrl', ['$scope', '$interval', '$routeParams', '$filter', 'dashboardConfig', 'GraphService', 'BoardService',
+  function ($scope, $interval, $routeParams, $filter, dashboardConfig, GraphService, BoardService) {
+
+    $scope.timers = Array();
+    $scope.graphs = dashboardConfig['graphs'];
+    $scope.selectedBoards = [];
+
+    $scope.graph_detail = $scope.graphs[$routeParams['type']];
+
+    var test =new Date(new Date().setYear(new Date().getFullYear() - 2)).getTime();
+
+    $scope.chartConfig = {
+      options: {
+        chart: {
+          zoomType: 'x',
+          type: $scope.graph_detail['type'],
+        },
+        rangeSelector: {
+          enabled: true,
+          buttons: [
+            {type: 'hour', count: 1, text: '1h'},
+            {type: 'day', count: 1, text: '1d'},
+            {type: 'day', count: 7, text: '1w'},
+            {type: 'month', count: 1, text: '1m'},
+            {type: 'year', count: 1, text: '1y'},
+          ],
+          inputEnabled: false,
+          allButtonsEnabled: true,
+          selected: 0,
+        },
+        navigator: {
+          enabled: true,
+          adaptToUpdatedData: true,
+          series: {
+            data: [[test,0]]
+          }
+        },
+        legend: {
+          enabled: true,
+        }
+      },
+      xAxis: {
+        events: {
+          setExtremes: setExtremes
+        }
+      },
+      yAxis: {
+        title: {
+          text: $scope.graph_detail['yAxisLabel']
+        }
+      },
+      series: [],
+      title: {
+        text: $scope.graph_detail['title']
+      },
+      useHighStocks: true
+    }
+    function setExtremes(e){
+      if (e.rangeSelectorButton != null){
+        var now = new Date()/1000;
+        var requested_time = e.rangeSelectorButton['_range']/1000;
+        graphData($routeParams['type'], now - requested_time);
+      }
+    }
+    function graphData(graph_type, start_time){
+      graph_type = $filter('lowercase')(graph_type);
+      var board_ids = $scope.selectedBoards.map(function(x){ return x['name']});
+      var graph_data = Array();
+      GraphService.getData(graph_type, start_time=start_time, board_ids=board_ids, last_available=10).then(function(data) {
+        angular.forEach(data['data'], function(value, key){
+          graph_data.push({
+            'name': value['name'],
+            'data': value['data'],
+          });
+        });
+        $scope.chartConfig.series = graph_data;
+      });
+    }
+    updateBoards = function(){
+      BoardService.getBoard().then(function(data){
+        $scope.boards = data['data'];
+      });
+    }
+    $scope.fClose = function(){
+      var now = new Date()/1000 - 60*60; //By default get last 60m
+      graphData($routeParams['type'], now);
+    }
+
+    updateBoards();
+
+    $scope.$on("$destroy", function(){
+      angular.forEach($scope.timers, function(value, key){
+        $interval.cancel(value);
+      });
+    });
+
+  }]);

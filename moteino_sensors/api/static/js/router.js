@@ -29,6 +29,10 @@ angular.module('dashboardApp').config(['$routeProvider',
           }
         }
       }).
+      when('/graph/:type', {
+        templateUrl: 'partials/graph.html',
+        controller: 'GraphCtrl'
+      }).
       otherwise({
         redirectTo: '/status'
       });

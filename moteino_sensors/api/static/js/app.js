@@ -3,7 +3,9 @@ var dashboardApp = angular.module('dashboardApp', [
   'ngResource',
   'dashboardControllers',
   'ngAnimate',
-  'ui.bootstrap'
+  'ui.bootstrap',
+  'isteven-multi-select',
+  'highcharts-ng',
 ]);
 
 dashboardApp.constant('dashboardConfig', {
@@ -14,6 +16,10 @@ dashboardApp.constant('dashboardConfig', {
   status: {
     'service': ['dbsm', 'fence', 'srl', 'mgw', 'msd'],
     'general': ['armed']
+  },
+  graphs: {
+    'Voltage': {'type': 'line', 'yAxisLabel': 'Voltage (V)', 'yRound': '.02f', 'title': 'Board voltage'},
+    'Uptime': {'type': 'line', 'yAxisLabel': 'Uptime', 'yRound': '.0f', 'title': 'Board uptime'}
   },
   offline_timeout: 1800,
 });

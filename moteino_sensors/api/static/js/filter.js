@@ -1,6 +1,6 @@
 angular.module('dashboardApp').filter('BoardOffline', function() {
   return function(items, offline_timeout){
-    now = new Date() / 1000;
+    var now = new Date() / 1000;
     return items.filter(function(element){
       if (now - element.last_update > offline_timeout){
         return true;
@@ -26,7 +26,7 @@ angular.module('dashboardApp').filter('BoardByMetric', function() {
 
 angular.module('dashboardApp').filter('LastUpdate', function() {
   return function(last_update){
-    now = new Date() / 1000;
+    var now = new Date() / 1000;
     return parseInt(now - last_update);
   }
 });
