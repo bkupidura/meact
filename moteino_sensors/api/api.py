@@ -72,17 +72,19 @@ def set_status():
 def get_board(board_id = None):
   start = None
   end = None
+  sensor_type = None
 
   if (bottle.request.json):
     start = bottle.request.json.get('start', start)
     end = bottle.request.json.get('end', end)
+    sensor_type = bottle.request.json.get('sensor_type', sensor_type)
 
   boards = database.get_boards(app.config['db'], board_ids=board_id)
 
   board_ids = [board.board_id for board in boards]
   board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
-  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end)
+  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end, sensor_type=sensor_type)
 
   output = dict()
 

@@ -2,6 +2,10 @@
   <div class="modal-header">
     <h3 class="modal-title">Details</h3>
   </div>
+  <div class="modal-body-map">
+    id: {{board['name']}}<br />
+    desc: {{board['desc']}}
+  </div>
   <div class="modal-body-map" ng-repeat="(data_key, data_value) in board['data']">
     {{data_key}}: {{data_value | MetricUnit:data_key}}
   </div>

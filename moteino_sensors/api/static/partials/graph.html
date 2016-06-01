@@ -1,12 +1,14 @@
 <div class="graph-wrapper">
-  <div isteven-multi-select
+  <div
+    isteven-multi-select
     input-model="boards"
     output-model="selectedBoards"
     button-label="name"
     item-label="name desc"
     tick-property="ticked"
     helper-elements=""
-    on-close="fClose()"
+    on-close="graphData()"
+    max-height="300px"
   >
   </div>
   <highchart id="chart" config="chartConfig"></highchart>

@@ -12,7 +12,7 @@
     <h3 class="modal-title">Send remote command</h3>
   </div>
   <div class="modal-body">
-    Which command you want to execute on board {{boardID}}?
+    Which command you want to execute on board {{boardDesc}} ({{boardID}})?
   </div>
   <div class="modal-footer">
   <span ng-repeat="cmd in commands">
@@ -28,7 +28,7 @@
   </input>
   </div>
   <div class="col-sm-4 margin" ng-repeat="board in boards | BoardByMetric:query">
-    <button uib-popover-template="'BoardDetail'" ng-click="actionOpen(board.name)" popover-trigger="mouseenter" popover-placement="auto top" popover-title="Details" class="btn btn-primary btn-xs">{{board.name}} {{board.desc}}</button>
+    <button uib-popover-template="'BoardDetail'" ng-click="actionOpen(board.name, board.desc)" popover-trigger="mouseenter" popover-placement="auto top" popover-title="Details" class="btn btn-primary btn-xs">{{board.name}} {{board.desc}}</button>
   </div>
   <br />
   <div class="col-sm-4 margin" ng-repeat="board in boards_offline | BoardByMetric:query">

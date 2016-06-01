@@ -18,8 +18,12 @@ dashboardApp.constant('dashboardConfig', {
     'general': ['armed']
   },
   graphs: {
-    'Voltage': {'type': 'line', 'yAxisLabel': 'Voltage (V)', 'yRound': '.02f', 'title': 'Board voltage'},
-    'Uptime': {'type': 'line', 'yAxisLabel': 'Uptime', 'yRound': '.0f', 'title': 'Board uptime'}
+    'Voltage': {'type': 'line', 'yAxisLabel': 'Voltage (V)', 'yRound': '2', 'title': 'Board voltage'},
+    'Uptime': {'type': 'line', 'yAxisLabel': 'Uptime', 'yRound': '0', 'title': 'Board uptime'},
+    'Temperature': {'type': 'line', 'yAxisLabel': 'Temperature (C)', 'yRound': '1', 'title': 'Board temperature'},
+    'Failedreport': {'type': 'scatter', 'yAxisLabel': 'Failed reports', 'yRound': '0', 'title': 'Number of failed reports'},
+    'Motion': {'type': 'scatter', 'yAxisLabel': 'Motion', 'yRound': '0', 'title': 'Detected motion'},
+    'RSSI': {'type': 'line', 'yAxisLabel': 'RSSI', 'yRound': '0', 'title': 'Board RSSI'}
   },
   offline_timeout: 1800,
 });

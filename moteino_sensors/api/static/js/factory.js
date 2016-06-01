@@ -1,7 +1,10 @@
 angular.module('dashboardApp').factory('BoardService', function($http) {
   return {
-    getBoard: function(start_time, end_time) {
-      return $http.post('/api/board', {start: start_time, end: end_time});
+    getBoard: function(start_time, end_time, sensor_type) {
+      return $http.post('/api/board', {start: start_time,
+          end: end_time,
+          sensor_type: sensor_type,
+      });
     }
   }
 });
