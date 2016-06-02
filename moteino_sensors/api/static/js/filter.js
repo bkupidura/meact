@@ -16,7 +16,7 @@ angular.module('dashboardApp').filter('BoardByMetric', function() {
         return true;
       } else {
         var re = new RegExp(query, "i");
-        if (re.test(element.name) || re.test(element.desc) || query in element.data){
+        if (re.test(element.id) || re.test(element.desc) || query in element.data){
           return true;
         }
       }

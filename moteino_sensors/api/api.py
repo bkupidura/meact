@@ -45,7 +45,7 @@ def static(filepath):
 
 
 @app.route('/api/mqtt', method=['POST'])
-def publish_mqtt():
+def post_mqtt():
   if (bottle.request.json):
     topic = bottle.request.json.get('topic')
     data = bottle.request.json.get('data')
@@ -60,25 +60,12 @@ def get_status():
 
 
 @app.route('/api/status', method=['POST'])
-def set_status():
+def post_status():
   data = bottle.request.json
   if data:
     app.config['mqtt'].publish_status(data)
 
-
-@app.route('/api/board', method=['GET', 'POST'])
-@app.route('/api/board/', method=['GET', 'POST'])
-@app.route('/api/board/<board_id>', method=['GET', 'POST'])
-def get_board(board_id = None):
-  start = None
-  end = None
-  sensor_type = None
-
-  if (bottle.request.json):
-    start = bottle.request.json.get('start', start)
-    end = bottle.request.json.get('end', end)
-    sensor_type = bottle.request.json.get('sensor_type', sensor_type)
-
+def handle_board_endpoint(board_id = None, sensor_type = None, start = None, end = None):
   boards = database.get_boards(app.config['db'], board_ids=board_id)
 
   board_ids = [board.board_id for board in boards]
@@ -89,7 +76,7 @@ def get_board(board_id = None):
   output = dict()
 
   for metric in last_metrics:
-    output.setdefault(metric.board_id, {'name': metric.board_id,
+    output.setdefault(metric.board_id, {'id': metric.board_id,
         'desc': board_desc[metric.board_id],
         'data': {},
         'last_update': 0
@@ -98,33 +85,48 @@ def get_board(board_id = None):
     if output[metric.board_id]['last_update'] < metric.last_update:
       output[metric.board_id]['last_update'] = metric.last_update
 
+  return output
+
+@app.route('/api/board', method=['GET'])
+@app.route('/api/board/', method=['GET'])
+@app.route('/api/board/<board_id>', method=['GET'])
+def get_board(board_id = None):
+  output = handle_board_endpoint(board_id)
   return json.dumps(output.values())
 
 
-@app.route('/api/graph/<graph_type>', method=['GET', 'POST'])
-def get_graph(graph_type = None):
-  now = int(time.time())
-  start = now - 60 * 60 * 24
-  end = now
-  last_available = 0
-  board_ids = None
-
+@app.route('/api/board', method=['POST'])
+@app.route('/api/board/', method=['POST'])
+@app.route('/api/board/<board_id>', method=['POST'])
+def post_board(board_id = None):
   if (bottle.request.json):
-    start = bottle.request.json.get('start', start)
-    end = bottle.request.json.get('end', end)
-    last_available = bottle.request.json.get('last_available', last_available)
-    board_ids = bottle.request.json.get('board_ids', board_ids)
+    board_id = bottle.request.json.get('board_id', board_id)
+    sensor_type = bottle.request.json.get('sensor_type', None)
+    start = bottle.request.json.get('start', None)
+    end = bottle.request.json.get('end', None)
 
+    output = handle_board_endpoint(board_id, sensor_type, start, end)
+  else:
+    output = handle_board_endpoint(board_id)
+
+  return json.dumps(output.values())
+
+
+def handle_graph_endpoint(board_id = None, graph_type = None, start = None, end = None, last_available = None):
   boards = database.get_boards(app.config['db'])
 
   board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
-  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, sensor_type=graph_type)
+  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_id, sensor_type=graph_type)
 
   output = list()
 
   for last_metric in last_metrics:
-    output.append({"name": board_desc[last_metric.board_id], "data": []})
+    output.append({
+        'id': last_metric.board_id,
+        'desc': board_desc[last_metric.board_id],
+        'data': []
+    })
 
     metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, start=start, end=end)
     if not metrics and last_available:
@@ -133,6 +135,27 @@ def get_graph(graph_type = None):
     for metric in metrics:
       data = (metric.last_update*1000, float(metric.sensor_data))
       output[-1]['data'].append(data)
+
+  return output
+
+@app.route('/api/graph/<graph_type>', method=['GET'])
+def get_graph(graph_type = None):
+  now = int(time.time())
+  output = handle_graph_endpoint(graph_type = graph_type, start = now - 60*60)
+  return json.dumps(output)
+
+@app.route('/api/graph/<graph_type>', method=['POST'])
+def post_graph(graph_type = None):
+  if (bottle.request.json):
+    now = int(time.time())
+    board_id = bottle.request.json.get('board_id', None)
+    start = bottle.request.json.get('start', now - 60*60)
+    end = bottle.request.json.get('end', None)
+    last_available = bottle.request.json.get('last_available', None)
+
+    output = handle_graph_endpoint(board_id, graph_type, start, end, last_available)
+  else:
+    output = handle_graph_endpoint(graph_type = graph_type)
 
   return json.dumps(output)
 

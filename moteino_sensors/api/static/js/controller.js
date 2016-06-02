@@ -155,14 +155,14 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
     updateMap = function(){
       var svg_map = d3.select('#svg-map');
       angular.forEach($scope.boards, function(value, key){
-        var svg_board = svg_map.select("#board-" + value['name']);
+        var svg_board = svg_map.select("#board-" + value['id']);
         svg_board.on('click', function(){
           boardOpen(value);
         })
         svg_board.attr('class', 'map-board-online');
       });
       angular.forEach($scope.boards_offline, function(value, key){
-        svg_map.select("#board-" + value['name']).attr('class', 'map-board-offline');
+        svg_map.select("#board-" + value['id']).attr('class', 'map-board-offline');
       });
     }
 
@@ -267,7 +267,7 @@ dashboardControllers.controller('GraphCtrl', ['$scope', '$interval', '$routePara
     $scope.graphData = function(){
       var graph_type = $filter('lowercase')($routeParams['type']);
       var start_time = $filter('LastUpdate')($scope.begin_offset);
-      var board_ids = $scope.selectedBoards.map(function(x){ return x['name']});
+      var board_ids = $scope.selectedBoards.map(function(x){ return x['id']});
       var graph_data = Array();
 
       if (board_ids.length > 0){
@@ -275,8 +275,8 @@ dashboardControllers.controller('GraphCtrl', ['$scope', '$interval', '$routePara
         GraphService.getData(graph_type, start_time, board_ids, 10).then(function(data) {
           angular.forEach(data['data'], function(value, key){
             graph_data.push({
-              'id': value['name'],
-              'name': value['name'],
+              'id': value['id'],
+              'name': value['desc'],
               'data': value['data'],
             });
           });

@@ -34,7 +34,7 @@ angular.module('dashboardApp').factory('GraphService', function($http) {
   return {
     getData: function(graph_type, start_time, board_ids, last_available) {
       return $http.post('/api/graph/' + graph_type, {start: start_time,
-          board_ids: board_ids,
+          board_id: board_ids,
           last_available: last_available
       });
     }
