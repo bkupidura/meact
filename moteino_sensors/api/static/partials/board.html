@@ -1,0 +1,37 @@
+<script type="text/ng-template" id="BoardDetail">
+  <div>
+    <span ng-repeat="(data_key, data_value) in board['data']">
+      {{data_key}}: {{data_value}}<br />
+    </span>
+    seen: {{board['last_update'] | LastUpdate}}
+  </div>
+</script>
+
+<script type="text/ng-template" id="BoardAction">
+  <div class="modal-header">
+    <h3 class="modal-title">Send remote command</h3>
+  </div>
+  <div class="modal-body">
+    Which command you want to execute on board {{boardDesc}} ({{boardID}})?
+  </div>
+  <div class="modal-footer">
+  <span ng-repeat="cmd in commands">
+    <button class="btn btn-warning btn-xs" ng-click="sendCommand(boardID, cmd)">{{cmd['name']}}</button>
+  </span>
+  </div>
+</script>
+
+<div class="board-wrapper">
+  <div class="board-search">
+  <span class="glyphicon glyphicon-search"></span>
+  <input placeholder="board_id" ng-model="query">
+  </input>
+  </div>
+  <div class="col-sm-4 margin" ng-repeat="board in boards | BoardByMetric:query">
+    <button uib-popover-template="'BoardDetail'" ng-click="actionOpen(board.id, board.desc)" popover-trigger="mouseenter" popover-placement="auto top" popover-title="Details" class="btn btn-primary btn-xs">{{board.id}} {{board.desc}}</button>
+  </div>
+  <br />
+  <div class="col-sm-4 margin" ng-repeat="board in boards_offline | BoardByMetric:query">
+    <button class="btn btn-danger btn-xs disabled">{{board.id}} {{board.desc}}</button>
+  </div>
+</div>

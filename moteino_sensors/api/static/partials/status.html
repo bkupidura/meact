@@ -1,0 +1,18 @@
+<div class="status-wrapper">
+  <h3>Service status</h3>
+  <div ng-repeat="s in status | filter:{type:'service'}">
+    <div class="col-sm-4 margin">{{s['name']}}</div>
+    <div class="col-sm-8 margin">
+      <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-model="radioModel" ng-click="changeStatus(s['name'])">Enabled</label>
+      <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-model="radioModel" ng-click="changeStatus(s['name'])">Disabled</label>
+    </div>
+  </div>
+  <h3>Status</h3>
+  <div ng-repeat="s in status | filter:{type:'general'}">
+    <div class="col-sm-4 margin">{{s['name']}}</div>
+    <div class="col-sm-8 margin">
+      <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-model="radioModel" ng-click="changeStatus(s['name'])">True</label>
+      <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-model="radioModel" ng-click="changeStatus(s['name'])">False</label>
+    </div>
+  </div>
+</div>

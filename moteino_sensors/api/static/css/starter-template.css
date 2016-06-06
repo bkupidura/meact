@@ -1,0 +1,41 @@
+.starter-template {
+  padding-top: 80px;
+  padding-left: 10px;
+}
+.status-wrapper{
+  padding-left: 10px;
+  width: 20%;
+  display: block;
+}
+.board-wrapper{
+  padding-top: 20px;
+  padding-left: 10px;
+  width: 40%;
+  display: block;
+}
+.map-wrapper{
+  width: 40%;
+  display: block;
+}
+.graph-wrapper{
+  padding-top: 20px;
+  padding-left: 10px;
+  width: 100%;
+  display: block;
+}
+.board-search{
+  padding-left: 10px;
+}
+.modal-body-map{
+  padding-left: 10px;
+}
+.map-board-online{
+  fill: #285F90;
+}
+.map-board-offline{
+  fill: #D77776;
+}
+.margin {
+  margin-top: 5px;
+  margin-bottom: 5px;
+}

@@ -1,179 +1,33 @@
-<html>
-    <head>
-        <script src="jquery.min.js"></script>
-        <script src="handlebars.js"></script>
-        <script src="highstock.js"></script>
-        <script src="exporting.js"></script>
-        <script src="sprintf.js"></script>
-        <script src="utils.js"></script>
-        <script src="mappings.js"></script>
-        <script src="d3.v3.min.js" charset="utf-8"></script>
-        <script src="d3-tip.js"></script>
-        <!-- Latest compiled and minified CSS -->
-        <link rel="stylesheet" href="dist/css/bootstrap.min.css">
-
-        <!-- Optional theme -->
-        <link rel="stylesheet" href="dist/css/bootstrap-theme.min.css">
-        
-        <!-- Custom styles for this template -->
-        <link href="starter-template.css" rel="stylesheet">
-
-        <!-- Latest compiled and minified JavaScript -->
-        <script src="dist/js/bootstrap.min.js"></script>
-        <script src="bootbox.min.js"></script>
-    </head>
-    <body>
-        <nav class="navbar navbar-inverse navbar-fixed-top">
-            <div class="container">
-                <h2>Moteino dashboard</h2>
-            </div>
-        </nav>
-        <div class="starter-template">
-            <ul id="mainTabs" class="nav nav-tabs">
-                <li role="presentation"><a href="#status" id="status-tab" data-toggle="tab">Status</a></li>
-                <li class="dropdown">
-                <a href="#" class="dropdown-toggle" id="node-tab" data-toggle="dropdown">Node<span class="caret"></span></a>
-                    <ul class="dropdown-menu" id="dropdown-menu-node" role="menu">
-                    </ul>
-                </li>
-                <li role="presentation"><a href="#map" id="map-tab" data-toggle="tab">Map</a></li>
-                <li class="dropdown">
-                <a href="#" class="dropdown-toggle" id="graph-tab" data-toggle="dropdown">Graph<span class="caret"></span></a>
-                    <ul class="dropdown-menu" id="dropdown-menu-graph" role="menu">
-                    </ul>
-                </li>
-            </ul>
-            <div class="tab-content">
-                <div class="tab-pane fade" id="status"></div>
-                <div class="tab-pane fade" id="node"></div>
-                <div class="tab-pane fade" id="map">
-                    <object type="image/svg+xml" data="map.svg" id="svg-map"></object>
-                </div>
-                <div class="tab-pane fade" id="graph"></div>
-            </div>
-        </div>
-    </body>
-    <script>
-        generate_menu('graph', graphs_mapping);
-        generate_menu('node', node_mapping);
-
-        for (var key in disabled_elems){
-            var elem = document.getElementById(disabled_elems[key]);
-            $(elem).hide();
-        }
-
-        Highcharts.setOptions({
-            global: {
-                useUTC: false,
-            }
-        });
-
-        $.get("handlebars.tpl", function(data) {
-            $("body").append(data);
-        });
-
-        Handlebars.registerHelper('UpdateToSec', function(last_update){
-            return last_seen(last_update)
-        });
-    </script>
-    <script>
-        api_endpoint = parent.location.protocol+'//'+window.location.hostname+':'+window.location.port+'/api';
-
-        $('.nav-tabs a').click(function(){
-            $(this).tab('show');
-        })
-        $(document).on('ready', function() {
-            $('.nav-tabs a').on('show.bs.tab', function(ev){
-                var href = $(ev.target).attr("href");
-
-                if ("refreshTimer" in window){
-                    clearInterval(refreshTimer);
-                }
-                refreshTimer = setInterval(refreshTab, 1000*60, this);
-
-                if (href == '#status'){
-                    $.getJSON(api_endpoint + '/status').done(function(data){
-                        var status_html = ''
-                        for (var k in status_mapping){
-                            var source = $(href + k + 'Template').html();
-                            var template = Handlebars.compile(source);
-                            var group_data = filterObject(data, status_mapping[k]);
-
-                            status_html += template(group_data);
-                        }
-
-                        $(href).html(status_html);
-                    });
-                } else if (href == '#node'){
-                    var start_date = (new Date() / 1000) - 60*60;
-                    var params = JSON.stringify({"start": start_date});
-                    $.postJSON(api_endpoint + '/node', params).done(function(data){
-                        var node_type = $(ev.target).text();
-                        var nodes = [];
-
-                        if (node_type == 'Offline'){
-                            var source = $(href + 'OfflineTemplate').html();
-                        } else {
-                            var source = $(href + 'Template').html();
-                        }
-                        for (var k in data){
-                            if (node_type == 'Offline'){
-                                if (last_seen(data[k]['last_update']) > config['node_offline']['time'] &&
-                                    config['node_offline']['ignore'].indexOf(data[k]['name']) < 0){
-                                    nodes.push(data[k]);
-                                }
-                            } else if (node_mapping[node_type].indexOf(data[k]['name']) >= 0){
-                                if (last_seen(data[k]['last_update']) < config['node_offline']['time']){
-                                    nodes.push(data[k]);
-                                }
-                            }
-                        }
-                        var template = Handlebars.compile(source);
-
-                        var node_html = template(nodes);
-
-                        $(href).html(node_html);
-                    });
-                } else if (href == '#map'){
-                    start_date = (new Date() / 1000) - 60*60;
-                    params = JSON.stringify({"start": start_date});
-                    $.postJSON(api_endpoint + '/node', params).done(function(data){
-                        var svg_map = document.getElementById("svg-map").contentDocument;
-                        d3.selectAll(".d3-tip").remove();
-                        for (var k in data){
-                            var svg_board = d3.select(svg_map).select("#board-" + data[k]['name']);
-                            if (!svg_board.empty()) {
-                                var tip = d3.tip()
-                                    .attr('class', 'd3-tip')
-                                    .offset([120, 15])
-                                    .direction('n')
-
-                                if (last_seen(data[k]['last_update']) < config['node_offline']['time']){
-                                    svg_board.attr("fill", "#008000");
-                                    var source = $('#mapOnlineTemplate').html();
-                                    var template = Handlebars.compile(source);
-                                } else {
-                                    var source = $('#mapOfflineTemplate').html();
-                                    var template = Handlebars.compile(source);
-                                    svg_board.attr("fill", "#FF0000");
-                                }
-
-                                tip.html(template(data[k]));
-                                svg_board.call(tip);
-                                svg_board.on('mouseover', tip.show);
-                                svg_board.on('mouseout', tip.hide);
-                            }
-                        }
-                    });
-                } else if (href == '#graph'){
-                    var graph_type = $(ev.target).text().toLowerCase();
-                    function callback(data){
-                        handleGraphRequest(graph_type, data);
-                    }
-
-                    $.postJSON(api_endpoint + '/graph/' + graph_type, '{"last_available": 10}', callback);
-                }
-            });
-        });
-    </script>
+<!doctype html>
+<html lang="en" ng-app="dashboardApp">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="bootstrap/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" href="css/starter-template.css">
+  <link rel="stylesheet" href="css/isteven-multi-select.css">
+  <script src="lib/jquery.min.js"></script>
+  <script src="bootstrap/js/bootstrap.min.js"></script>
+  <script src="lib/d3.v3.min.js"></script>
+  <script src="lib/sprintf.js"></script>
+  <script src="lib/highstock.js"></script>
+  <script src="lib/angular.min.js"></script> <!-- https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5 -->
+  <script src="lib/angular-route.min.js"></script>
+  <script src="lib/angular-resource.min.js"></script>
+  <script src="lib/angular-animate.min.js"></script>
+  <script src="lib/angular-touch.min.js"></script>
+  <script src="lib/ui-bootstrap-tpls-1.3.3.js"></script>
+  <script src="lib/isteven-multi-select.js"></script>
+  <script src="lib/highcharts-ng.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/controller.js"></script>
+  <script src="js/factory.js"></script>
+  <script src="js/filter.js"></script>
+</head>
+<body>
+  <div ng-include="'partials/menu.html'" ng-controller="MenuCtrl"></div>
+  <div ng-view></div>
+</body>
 </html>
