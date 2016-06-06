@@ -146,8 +146,8 @@ def get_graph(graph_type = None):
 
 @app.route('/api/graph/<graph_type>', method=['POST'])
 def post_graph(graph_type = None):
+  now = int(time.time())
   if (bottle.request.json):
-    now = int(time.time())
     board_id = bottle.request.json.get('board_id', None)
     start = bottle.request.json.get('start', now - 60*60)
     end = bottle.request.json.get('end', None)
@@ -155,7 +155,7 @@ def post_graph(graph_type = None):
 
     output = handle_graph_endpoint(board_id, graph_type, start, end, last_available)
   else:
-    output = handle_graph_endpoint(graph_type = graph_type)
+    output = handle_graph_endpoint(graph_type = graph_type, start = now - 60*60)
 
   return json.dumps(output)
 
