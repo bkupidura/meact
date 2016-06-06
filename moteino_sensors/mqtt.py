@@ -25,6 +25,7 @@ class Mqtt(object):
         self.enabled = self.status[self.name]
 
   def _on_connect(self, client, userdata, flags, rc):
+    LOG.info('Connection to broker established')
     if 'subscribe_to' in userdata:
       self.subscribe(userdata['subscribe_to'])
 
@@ -67,7 +68,7 @@ class Mqtt(object):
     userdata = {
       'subscribe_to': subscribe_to
     }
-    self.mqtt = paho.Client(userdata=userdata)
+    self.mqtt = paho.Client(userdata=userdata, protocol=paho.MQTTv31)
     self._connect(self.mqtt_config['server'])
 
     for t in topic_subscribe:

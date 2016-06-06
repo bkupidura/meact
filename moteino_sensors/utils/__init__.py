@@ -123,3 +123,18 @@ def load_actions():
     return mapping
 
 
+def eval_helper(threshold_lambda, arg1=None, arg2=None):
+  threshold_func = eval(threshold_lambda)
+  threshold_func_arg_number = threshold_func.func_code.co_argcount
+
+  if threshold_func_arg_number == 0:
+    threshold_result = threshold_func()
+  elif threshold_func_arg_number == 1:
+    threshold_result = threshold_func(arg1)
+  elif threshold_func_arg_number == 2:
+    try:
+      threshold_result = threshold_func(arg1, arg2)
+    except (IndexError):
+      LOG.info('Not enough values stored to check threshold')
+      threshold_result = False
+  return threshold_result

@@ -13,10 +13,13 @@ class Msd(DBQuery):
 
   def _handle_result(self, board_id, value):
     now = int(time.time())
-    data = {'board_id': board_id,
-            'sensor_data': str(now - value),
-            'sensor_type': self.name}
-    self.publish(self.mqtt_config['topic']['mgw/action'], data)
+    last_seen = now - value
+    if utils.eval_helper(self.threshold, last_seen):
+      LOG.debug("Board '%s' last seen '%s' seconds ago", board_id, last_seen)
+      data = {'board_id': board_id,
+              'sensor_data': str(last_seen),
+              'sensor_type': self.name}
+      self.publish(self.mqtt_config['topic']['mgw/action'], data)
 
 
 LOG = logging.getLogger(__name__)

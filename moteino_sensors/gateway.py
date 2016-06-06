@@ -174,22 +174,6 @@ class Mgw(mqtt.Mqtt):
 
     return sensor_configs
 
-  def _eval_helper(self, threshold_lambda, data, last_values):
-    threshold_func = eval(threshold_lambda)
-    threshold_func_arg_number = threshold_func.func_code.co_argcount
-
-    if threshold_func_arg_number == 0:
-      threshold_result = threshold_func()
-    elif threshold_func_arg_number == 1:
-      threshold_result = threshold_func(data)
-    elif threshold_func_arg_number == 2:
-      try:
-        threshold_result = threshold_func(data, last_values)
-      except (IndexError):
-        LOG.info('Not enough values stored to check threshold')
-        threshold_result = False
-    return threshold_result
-
   def _action_execute(self, sensor_data, actions, global_action_config, sensor_action_config):
     result = 0
 
@@ -246,7 +230,7 @@ class Mgw(mqtt.Mqtt):
       if not sensor_action.action_for_board(sensor_data['board_id']):
         continue
 
-      threshold_result = self._eval_helper(sensor_action['threshold'],
+      threshold_result = utils.eval_helper(sensor_action['threshold'],
               sensor_data['sensor_data'],
               self.action_status.get_values(action_status_id_hex))
 
@@ -265,9 +249,8 @@ class Mgw(mqtt.Mqtt):
 
       check_status = True
       for status_name in sensor_action['check_status']:
-        check_status = self._eval_helper(sensor_action['check_status'][status_name],
-                self.status.get(status_name),
-                [])
+        check_status = utils.eval_helper(sensor_action['check_status'][status_name],
+                self.status.get(status_name))
         if not check_status:
           break
 

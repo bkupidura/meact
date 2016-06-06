@@ -23,6 +23,7 @@ class DBQuery(mqtt.Mqtt):
     self.loop_sleep = conf[self.name]['loop_sleep']
     self.db_string = conf['db_string']
     self.query = conf[self.name]['query']
+    self.threshold = conf[self.name]['threshold']
     self.mqtt_config = conf['mqtt']
 
     self.start_mqtt()
@@ -36,14 +37,10 @@ class DBQuery(mqtt.Mqtt):
       self.enabled.wait()
 
       result = self.db.execute(self.query)
-      self._handle_query_result(result)
+      for board_id, value in result:
+        self._handle_result(board_id, value)
 
       time.sleep(self.loop_sleep)
-
-  def _handle_query_result(self, query_result):
-      for board_id, value in query_result:
-        LOG.debug("Got query result (%s) for board '%s' value '%s'", self.name, board_id, value)
-        self._handle_result(board_id, value)
 
   @abc.abstractmethod
   def _handle_result(self, board_id, value):
