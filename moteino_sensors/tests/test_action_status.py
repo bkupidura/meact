@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from moteino_sensors import gateway
+from moteino_sensors.executor import executor
 
 board_id = '1'
 sensor_type = 'test'
@@ -15,7 +15,7 @@ action_status_id = board_id + sensor_type
 action_status_id_hex = hashlib.md5(action_status_id).hexdigest()
 sensor_config_id = 'test'
 
-action_status = gateway.ActionStatusAdapter()
+action_status = executor.ActionStatusAdapter()
 action_status.build_defaults(action_status_id_hex,
         sensor_config_id,
         board_id,

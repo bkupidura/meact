@@ -294,7 +294,7 @@ LOG = logging.getLogger(__name__)
 ACTIONS_MAPPING = utils.load_actions()
 
 def main():
-  parser = utils.create_arg_parser('Moteino gateway')
+  parser = utils.create_arg_parser('Moteino executor')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')

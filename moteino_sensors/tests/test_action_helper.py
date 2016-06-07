@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from moteino_sensors import gateway
+from moteino_sensors.executor import executor
 from moteino_sensors import utils
 
 default_sensor_config = {
@@ -145,7 +145,7 @@ def test_config_for_board(board_ids, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['board_ids'] = board_ids
 
-  ada = gateway.SensorActionAdapter(sensor_config['actions'][0])
+  ada = executor.SensorActionAdapter(sensor_config['actions'][0])
 
   assert ada.action_for_board(board_id) == expected
 
