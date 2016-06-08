@@ -22,9 +22,6 @@ action_status.build_defaults(action_status_id_hex,
         sensor_type)
 
 def build_action_status(action_status):
-  action_status[action_status_id_hex]['last_value'] = \
-        [int(time.time()) - i for i in xrange(10)]
-
   action_status[action_status_id_hex][sensor_config_id]['last_fail'] = \
         [int(time.time()) - i for i in xrange(10)]
 
@@ -119,33 +116,3 @@ def test_last_action(action_interval, expected):
           action_interval)
 
   assert ada == expected
-
-update_values_test_data = (
-  (
-    (1, 123),
-    (1, 123)
-  ),
-  (
-    (10, 142),
-    (10, 142)
-  ),
-  (
-    (11, 151),
-    (11, 151)
-  ),
-)
-
-@pytest.mark.parametrize('update_values, expected', update_values_test_data)
-def test_update_values(update_values, expected):
-  test_action_status = copy.deepcopy(action_status)
-  test_action_status = build_action_status(test_action_status)
-
-  test_action_status.update_values(action_status_id_hex,
-          update_values[0],
-          update_values[1])
-
-  ada = len(test_action_status[action_status_id_hex]['last_value'])
-  ada1 = test_action_status[action_status_id_hex]['last_value'].pop(-1)
-
-  assert ada == expected[0]
-  assert ada1 == expected[1]

@@ -11,9 +11,11 @@ default_sensor_config = {
   'priority': 100,
   'value_count': 1,
   'actions': [
-    {'check_status': {
-      'armed': 'lambda x: int(x)==1',
-    },
+    {
+    'check_status': [
+        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
+    ],
+    'check_metric': [],
     'action_interval': 0,
     'threshold': 'lambda x: True',
     'fail_count': 0,
@@ -30,17 +32,53 @@ default_sensor_config = {
 board_id = '1'
 check_status_test_data = (
   (
-    {
-        'armed': 'lambda x: int(x)==1',
-    },
+    [
+        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
+    ],
     True
   ),
   (
-    {
-        'armed': 'lambda x: int(x)==1',
-        'fence': 'lambda x: int(x)==0',
-    },
+    [
+        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
+        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+    ],
     True
+  ),
+  (
+    [],
+    True
+  ),
+  (
+    [
+        {'name': 'armed'},
+        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+    ],
+    False
+  ),
+  (
+    [
+        {'threshold': 'lambda x: int(x)==1'},
+        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+    ],
+    False
+  ),
+  (
+    [
+        {},
+    ],
+    False
+  ),
+  (
+    [
+        {'name': 10, 'treshold': 'lambda x: int(x)==1'},
+    ],
+    False
+  ),
+  (
+    [
+        {'name': 'armed', 'threshold': [10]},
+    ],
+    False
   ),
   (
     {
@@ -72,6 +110,107 @@ check_status_test_data = (
 def test_should_check_status(check_status, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
   sensor_config['actions'][0]['check_status'] = check_status
+
+  ada, data = utils.validate_sensor_config(sensor_config)
+
+  assert ada == expected
+
+check_metric_test_data = (
+  (
+    [
+        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': 1, 'threshold': 'lambda x: int(x)==1'},
+    ],
+    True
+  ),
+  (
+    [
+        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': 0, 'threshold': 'lambda x: int(x)==1'}
+    ],
+    True
+  ),
+  (
+    [],
+    True
+  ),
+  (
+    [
+        {'board_ids': [], 'value_count': 1, 'threshold': 'lambda x: int(x)==1'}
+    ],
+    False
+  ),
+  (
+    [
+        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': 1}
+    ],
+    False
+  ),
+  (
+    [
+        {},
+    ],
+    False
+  ),
+  (
+    [
+        {'name': 10, 'threshold': 'lambda x: int(x)==1'},
+    ],
+    False
+  ),
+  (
+    [
+        {'threshold': 'lambda x: int(x)==1'},
+        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+    ],
+    False
+  ),
+  (
+    [
+        {},
+    ],
+    False
+  ),
+  (
+    [
+        {'name': 10, 'threshold': 'lambda x: int(x)==1'},
+    ],
+    False
+  ),
+  (
+    [
+        {'name': 'armed', 'threshold': [10]},
+    ],
+    False
+  ),
+  (
+    {
+        'armed': 10,
+    },
+    False
+  ),
+  (
+    {
+        'armed': {},
+    },
+    False
+  ),
+  (
+    {
+        'armed': [],
+    },
+    False
+  ),
+  (
+    {
+        'armed': None,
+    },
+    False
+  )
+)
+
+@pytest.mark.parametrize('check_metric, expected', check_metric_test_data)
+def test_should_check_metric(check_metric, expected):
+  sensor_config = copy.deepcopy(default_sensor_config)
+  sensor_config['actions'][0]['check_metric'] = check_metric
 
   ada, data = utils.validate_sensor_config(sensor_config)
 
@@ -511,7 +650,8 @@ default_test_data = (
       "actions": [
         {
           "action_interval": 0,
-          "check_status": {},
+          "check_status": [],
+          "check_metric": [],
           "threshold": "lambda: True",
           "fail_count": 0,
           "fail_interval": 600,

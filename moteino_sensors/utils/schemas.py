@@ -60,9 +60,41 @@ SCHEMA_DEFINITIONS = {
           "items": {"$ref": "#/definitions/boardID"}
         },
         "check_status": {
-          "type": "object",
-          "default": {},
-          "additionalProperties": {"$ref": "#/definitions/notEmptyString"}
+          "type": "array",
+          "uniqueItems": True,
+          "default": [],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"$ref": "#/definitions/notEmptyString"},
+              "threshold": {"$ref": "#/definitions/notEmptyString"}
+            },
+            "required": ["name", "threshold"]
+          }
+        },
+        "check_metric": {
+          "type": "array",
+          "uniqueItems": True,
+          "default": [],
+          "items": {
+            "type": "object",
+            "properties": {
+              "sensor_type": {"$ref": "#/definitions/notEmptyString"},
+              "threshold": {"$ref": "#/definitions/notEmptyString"},
+              "board_ids": {
+                "type": "array",
+                "uniqueItems": True,
+                "default": [],
+                "items": {"$ref": "#/definitions/boardID"}
+              },
+              "value_count": {
+                "minimum": 0,
+                "type": "integer",
+                "default": 1
+              }
+            },
+            "required": ["sensor_type", "threshold"]
+          }
         },
         "action_config": {
           "type": "object",

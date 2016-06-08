@@ -30,7 +30,7 @@
     "actions": [
       {
       "action": [{"name": "send_sms_at", "failback": [{"name": "send_bulksms", "failback": [{"name": "send_mail"}]}]}, {"name": "log"}],
-      "check_status": {"armed": "lambda x: int(x)==1"},
+      "check_status": [{"name": "armed", "threshold": "lambda x: int(x)==1"}],
       "action_interval": 360,
       "threshold": "lambda x: int(x)==1",
       "fail_count": 0,

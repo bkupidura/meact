@@ -36,8 +36,7 @@ class ActionStatusAdapter(dict):
   to easily work with action status
   """
   def build_defaults(self, id_hex, sensor_config_id, board_id, sensor_type):
-    self.setdefault(id_hex, {'last_value': [],
-      'board_id': board_id,
+    self.setdefault(id_hex, {'board_id': board_id,
       'sensor_type': sensor_type
     })
     self[id_hex].setdefault(sensor_config_id, {'last_action': 0,
@@ -67,15 +66,6 @@ class ActionStatusAdapter(dict):
   def update_last_action(self, id_hex, sensor_config_id):
     now = int(time.time())
     self[id_hex][sensor_config_id]['last_action'] = now
-
-  def update_values(self, id_hex, value_count, value):
-    if value_count > 0:
-      self[id_hex]['last_value'].append(value)
-      while len(self[id_hex]['last_value']) > value_count:
-        self[id_hex]['last_value'].pop(0)
-
-  def get_values(self, id_hex):
-    return self[id_hex]['last_value']
 
 
 class Mgw(mqtt.Mqtt):
@@ -227,45 +217,72 @@ class Mgw(mqtt.Mqtt):
               sensor_action['id'],
               sensor_action['fail_interval'])
 
+      #Check if config is for given board
       if not sensor_action.action_for_board(sensor_data['board_id']):
         continue
 
-      threshold_result = utils.eval_helper(sensor_action['threshold'],
-              sensor_data['sensor_data'],
-              self.action_status.get_values(action_status_id_hex))
-
-      self.action_status.update_values(action_status_id_hex,
-              sensor_config['value_count'],
-              sensor_data['sensor_data'])
-
-      if not threshold_result:
-        continue
-
+      #Format message
       try:
         sensor_data['message'] = sensor_action['message_template'].format(**sensor_data)
       except (KeyError, ValueError) as e:
         LOG.error("Fail to format message '%s' with data '%s'", sensor_action['message_template'], sensor_data)
         continue
 
-      check_status = True
-      for status_name in sensor_action['check_status']:
-        check_status = utils.eval_helper(sensor_action['check_status'][status_name],
-                self.status.get(status_name))
-        if not check_status:
-          break
+      #Get historical metrics if needed
+      if sensor_config['value_count']:
+        metrics = database.get_metrics(self.db,
+                board_ids=sensor_data['board_id'],
+                sensor_type=sensor_data['sensor_type'],
+                last_available=sensor_config['value_count'])
+      else:
+        metrics = []
 
-      if not check_status:
+      #Check threshold function
+      threshold_result = utils.eval_helper(sensor_action['threshold'],
+              sensor_data['sensor_data'],
+              metrics)
+
+      if not threshold_result:
         continue
 
+      #Check status threshold function
+      check_status_result = True
+      for check_status in sensor_action['check_status']:
+        check_status_result = utils.eval_helper(check_status['threshold'],
+                self.status.get(check_status['name']))
+        if not check_status_result:
+          break
+
+      if not check_status_result:
+        continue
+
+      #Check metrics threshold function
+      check_metric_result = True
+      for check_metric in sensor_action['check_metric']:
+        metrics = database.get_metrics(self.db,
+                board_ids=check_metric['board_ids'],
+                sensor_type=check_metric['sensor_type'],
+                last_available=check_metric['value_count'])
+        check_metric_result = utils.eval_helper(check_metric['threshold'],
+                metrics)
+        if not check_metric_result:
+          break
+
+      if not check_metric_result:
+        continue
+
+      #Check failed count
       if not self.action_status.check_failed_count(action_status_id_hex,
               sensor_action['id'],
               sensor_action['fail_count']):
         continue
 
+      #Check last action time
       if not self.action_status.check_last_action(action_status_id_hex,
               sensor_action['id'],
               sensor_action['action_interval']):
         continue
+
 
       LOG.info("Action execute for data '%s'", sensor_data)
       if self._action_execute(sensor_data,
