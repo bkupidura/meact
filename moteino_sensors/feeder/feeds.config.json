@@ -1,0 +1,24 @@
+{
+  "fencing": {
+    "name": "http_json",
+    "jq_expression": "to_entries | .[] | {\"board_id\": .key, \"sensor_type\": \"leave\", \"sensor_data\": .value.action}",
+    "feed_interval": 120,
+    "mqtt_topic": "dbsm/metric",
+    "params": {
+      "method": "GET",
+      "url": "https://example.com/geo.php",
+      "auth_user": "user",
+      "auth_pass": "password"
+    }
+  },
+  "msd": {
+    "name": "sql",
+    "feed_interval": 300,
+    "jq_expression": ".[] | {\"board_id\": .[0], \"sensor_type\": \"msd\", \"sensor_data\": .[1] | tostring}",
+    "mqtt_topic": "mgw/action",
+    "params": {
+      "db_string": "sqlite:////srv/mgw/mgw.db",
+      "db_query": "SELECT board_id,max(last_update) FROM last_metrics GROUP BY board_id"
+    }
+  }
+}
