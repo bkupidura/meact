@@ -60,13 +60,6 @@ class Feeder(mqtt.Mqtt):
     else:
       return feed_result.get('sensor_data', None)
 
-  def _prepare_sensor_data(self, sensor_data):
-    validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
-    if not validation_result:
-      return None
-
-    return sensor_data
-
   def run(self):
     LOG.info('Starting')
     self.loop_start()
@@ -82,13 +75,15 @@ class Feeder(mqtt.Mqtt):
 
         feed_result = self._feed_helper(self.feeds[feed_name])
         
-        if feed_result:
-          self.feeds_status.update_last_feed(feed_name)
+        if not feed_result:
+          continue
 
-          for sensor_data in feed_result:
-            sensor_data = self._prepare_sensor_data(sensor_data)
-            if sensor_data:
-              LOG.info('got data')
+        self.feeds_status.update_last_feed(feed_name)
+
+        for sensor_data in feed_result:
+          sensor_data = utils.prepare_sensor_data(sensor_data)
+          if sensor_data:
+            LOG.info('got data')
 
       time.sleep(2)
 

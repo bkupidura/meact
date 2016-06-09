@@ -10,6 +10,7 @@ from jsonschema import Draft4Validator, validators
 from jsonschema.exceptions import ValidationError
 
 from moteino_sensors import actions
+from moteino_sensors import feeds
 from moteino_sensors.utils import schemas
 
 LOG = logging.getLogger(__name__)
@@ -123,6 +124,20 @@ def load_actions():
     return mapping
 
 
+def load_feeds():
+    mapping = {}
+
+    prefix = feeds.__name__ + '.'
+    for _, feed_name, _ in pkgutil.iter_modules(feeds.__path__):
+        feed_module = __import__(prefix + feed_name,
+                                   globals(), locals(), fromlist=[feed_name, ])
+        feed_func = getattr(feed_module, feed_name)
+        timeout = getattr(feed_module, 'TIMEOUT', 10)
+        mapping[feed_name] = {'func': feed_func, 'timeout': timeout}
+        # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
+    return mapping
+
+
 def eval_helper(threshold_lambda, arg1=None, arg2=None):
   threshold_func = eval(threshold_lambda)
   threshold_func_arg_number = threshold_func.func_code.co_argcount
@@ -138,3 +153,11 @@ def eval_helper(threshold_lambda, arg1=None, arg2=None):
       LOG.info('Not enough values stored to check threshold')
       threshold_result = False
   return threshold_result
+
+
+def prepare_sensor_data(sensor_data):
+  validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
+  if not validation_result:
+    return None
+
+  return sensor_data

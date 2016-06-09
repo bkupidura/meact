@@ -25,17 +25,10 @@ class Dbsm(mqtt.Mqtt):
   def _on_message(self, client, userdata, msg):
     sensor_data = utils.load_json(msg.payload)
 
-    sensor_data = self._prepare_sensor_data(sensor_data)
+    sensor_data = utils.prepare_sensor_data(sensor_data)
 
     if sensor_data:
       self.metric_queue.put(sensor_data)
-
-  def _prepare_sensor_data(self, sensor_data):
-    validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
-    if not validation_result:
-      return None
-
-    return sensor_data
 
   def run(self):
     LOG.info('Starting')

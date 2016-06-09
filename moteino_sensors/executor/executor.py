@@ -136,20 +136,14 @@ class Mgw(mqtt.Mqtt):
     self.action_queue.put((priority, sensor_data, sensor_config))
 
   def _prepare_data(self, sensor_data):
-    sensor_data = self._prepare_sensor_data(sensor_data)
+    sensor_data = utils.prepare_sensor_data(sensor_data)
     sensor_config = self._prepare_sensor_config(sensor_data)
 
+    if sensor_data:
+      board_id = sensor_data['board_id']
+      sensor_data['board_desc'] = self.boards_map.get(board_id)
+
     return sensor_data, sensor_config
-
-  def _prepare_sensor_data(self, sensor_data):
-    validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
-    if not validation_result:
-      return None
-
-    board_id = sensor_data['board_id']
-    sensor_data['board_desc'] = self.boards_map.get(board_id)
-
-    return sensor_data
 
   def _prepare_sensor_config(self, sensor_data):
     if not sensor_data:

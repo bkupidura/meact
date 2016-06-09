@@ -6,7 +6,7 @@ SCHEMA_DEFINITIONS = {
   "boardID": {
     "type": "string",
     "minLength": 1,
-    "pattern": "^[a-zA-Z0-9]+$"
+    "pattern": "^[a-zA-Z0-9\-]+$"
   },
   "action": {
     "type": "array",
