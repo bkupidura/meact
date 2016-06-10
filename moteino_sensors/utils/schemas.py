@@ -53,11 +53,28 @@ SCHEMA_DEFINITIONS = {
           "minLength": 1,
           "default": "lambda: True"
         },
+        "transform": {
+          "type": "string",
+          "minLength": 1,
+          "default": "lambda x: x"
+        },
         "board_ids": {
           "type": "array",
           "uniqueItems": True,
           "default": [],
           "items": {"$ref": "#/definitions/boardID"}
+        },
+        "value_count": {
+          "type": "object",
+          "default": {"type": "none", "count": 0},
+          "properties": {
+            "type": {"$ref": "#/definitions/notEmptyString"},
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["type", "count"]
         },
         "check_status": {
           "type": "array",
@@ -88,9 +105,16 @@ SCHEMA_DEFINITIONS = {
                 "items": {"$ref": "#/definitions/boardID"}
               },
               "value_count": {
-                "minimum": 0,
-                "type": "integer",
-                "default": 1
+                "type": "object",
+                "default": {"type": "none", "count": 0},
+                "properties": {
+                  "type": {"$ref": "#/definitions/notEmptyString"},
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["type", "count"]
               }
             },
             "required": ["sensor_type", "threshold"]
@@ -132,12 +156,28 @@ SCHEMA_SENSOR_CONFIG = {
       "type": "integer",
       "default": 500
     },
-    "value_count": {
-      "minimum": 0,
-      "type": "integer",
-      "default": 0
-    },
     "actions": {"$ref": "#/definitions/actions"}
   },
   "required": ["actions"]
+}
+
+SCHEMA_FEED_CONFIG = {
+  "definitions": SCHEMA_DEFINITIONS,
+  "type": "object",
+  "properties": {
+    "name": {"$ref": "#/definitions/notEmptyString"},
+    "expression": {"$ref": "#/definitions/notEmptyString"},
+    "mqtt_topic": {"$ref": "#/definitions/notEmptyString"},
+    "feed_interval": {
+      "minimum": 0,
+      "type": "integer",
+      "default": 600
+    },
+    "params": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": {"$ref": "#/definitions/notEmptyString"}
+    }
+  },
+  "required": ["name", "expression", "mqtt_topic"]
 }

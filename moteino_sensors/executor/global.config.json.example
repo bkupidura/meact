@@ -51,9 +51,9 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status",
-         "mgw/action": "mgw/action",
-         "dbsm/metric": "dbsm/metric"
+         "mgmt/status": "mgmt/status/+",
+         "mgw/action": "mgw/action/+/+",
+         "dbsm/metric": "dbsm/metric/+/+"
        },
        "mgmt/status": "mgmt/status",
        "mgw/action": "mgw/action"
@@ -61,11 +61,10 @@
   },
   "status": {
     "mgw": 1,
-    "msd": 1,
     "srl": 1,
     "armed": 1,
-    "fence": 1,
-    "dbsm": 1
+    "dbsm": 1,
+    "feeder": 1
   },
   "db_string": "sqlite:////etc/mgw/mgw.db"
 }

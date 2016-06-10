@@ -23,9 +23,7 @@ class Dbsm(mqtt.Mqtt):
     self.start_mqtt()
 
   def _on_message(self, client, userdata, msg):
-    sensor_data = utils.load_json(msg.payload)
-
-    sensor_data = utils.prepare_sensor_data(sensor_data)
+    sensor_data = utils.prepare_sensor_data_mqtt(msg)
 
     if sensor_data:
       self.metric_queue.put(sensor_data)

@@ -65,7 +65,7 @@ class Srl(mqtt.Mqtt):
         continue
 
       LOG.debug("Got data from serial '%s'", sensor_data)
-      self.publish(self.mqtt_config['topic']['dbsm/metric'], sensor_data)
+      self.publish_metric(self.mqtt_config['topic']['dbsm/metric'], sensor_data)
 
 
 LOG = logging.getLogger(__name__)

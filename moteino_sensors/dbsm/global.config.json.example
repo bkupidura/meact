@@ -6,8 +6,8 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status",
-         "dbsm/metric": "dbsm/metric"
+         "mgmt/status": "mgmt/status/+",
+         "dbsm/metric": "dbsm/metric/+/+"
        }
     }
   },

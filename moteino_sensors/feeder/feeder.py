@@ -24,19 +24,29 @@ class FeedsStatusAdapter(dict):
     self[feed_name]['last_feed'] = now
 
 class Feeder(mqtt.Mqtt):
-  def __init__(self, conf, feeds):
+  def __init__(self, conf, feeds_map_file):
     super(Feeder, self).__init__()
     self.name = 'feeder'
     self.enabled = Event()
     self.enabled.set()
-    self.conf = conf
     self.mqtt_config = conf['mqtt']
-    self.feeds = feeds
     self.feeds_status = FeedsStatusAdapter()
     self.start_mqtt()
+    self._validate_feeds(feeds_map_file)
 
-  def _feed_helper(self, feed):
-    feed_name = feed['name']
+  def _validate_feeds(self, feeds_map_file):
+    feeds_map = utils.load_config(feeds_map_file)
+    self.feeds_map = dict()
+
+    for feed_name in feeds_map:
+      feed_config = feeds_map[feed_name]
+      validation_result, feed_config = utils.validate_feed_config(feed_config)
+
+      if validation_result:
+        self.feeds_map[feed_name] = feed_config
+
+  def _feed_helper(self, feed_config):
+    feed_name = feed_config['name']
     feed_func = FEEDS_MAPPING.get(feed_name)
 
     if not feed_func:
@@ -44,9 +54,11 @@ class Feeder(mqtt.Mqtt):
       return
 
     feed_result = Manager().dict()
-    p = Process(target=feed_func.get('func'), args=(feed, feed_result))
+    feed_func_timeout = feed_config.get('timeout') or feed_func.get('timeout')
+
+    p = Process(target=feed_func.get('func'), args=(feed_config, feed_result))
     p.start()
-    p.join(feed_func.get('timeout'))
+    p.join(feed_func_timeout)
 
     if p.is_alive():
       p.terminate()
@@ -65,25 +77,26 @@ class Feeder(mqtt.Mqtt):
     self.loop_start()
     while True:
       self.enabled.wait()
-      for feed_name in self.feeds:
-        feed_config = self.feeds[feed_name]
+      for feed_name in self.feeds_map:
+        feed_config = self.feeds_map[feed_name]
 
         self.feeds_status.build_defaults(feed_name)
 
         if not self.feeds_status.check_last_feed(feed_name, feed_config['feed_interval']):
           continue
 
-        feed_result = self._feed_helper(self.feeds[feed_name])
+        feed_result = self._feed_helper(feed_config)
         
         if not feed_result:
           continue
 
+        LOG.debug("Got feed provider response '%s'", feed_result)
         self.feeds_status.update_last_feed(feed_name)
 
         for sensor_data in feed_result:
           sensor_data = utils.prepare_sensor_data(sensor_data)
           if sensor_data:
-            LOG.info('got data')
+            self.publish_metric(feed_config['mqtt_topic'], sensor_data)
 
       time.sleep(2)
 
@@ -96,12 +109,12 @@ def main():
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.config.json')
-  feeds = utils.load_config(args.dir + '/feeds.config.json')
+  feeds_map_file = args.dir + '/feeds.config.json'
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  feeder = Feeder(conf=conf, feeds=feeds)
+  feeder = Feeder(conf=conf, feeds_map_file=feeds_map_file)
   feeder.run()
 
 

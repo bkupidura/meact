@@ -17,7 +17,8 @@ class Mqtt(object):
     super(Mqtt, self).__init__()
 
   def _on_mgmt_status(self, client, userdata, msg):
-    self.status = utils.load_json(msg.payload)
+    status_name = msg.topic.split('/')[2]
+    self.status[status_name] = msg.payload
     if self.name in self.status and hasattr(self, 'enabled'):
       if isinstance(self.enabled, _Event):
         self.enabled.set() if self.status[self.name] else self.enabled.clear()
@@ -72,7 +73,7 @@ class Mqtt(object):
     self._connect(self.mqtt_config['server'])
 
     for t in topic_subscribe:
-      if topic_subscribe[t] == 'mgmt/status':
+      if t == 'mgmt/status':
         self.mqtt.message_callback_add(topic_subscribe[t], self._on_mgmt_status)
       else:
         self.mqtt.message_callback_add(topic_subscribe[t], self._on_message)
@@ -81,31 +82,15 @@ class Mqtt(object):
     self.mqtt.loop_start()
     self.mqtt._thread.setName(self.name+'-mqtt')
 
-  def _create_sensor_data(self, sensor_type, sensor_data, board_id=None):
-    if board_id is None or not isinstance(board_id, str):
-      board_id = self.name
-
-    sensor_data = {
-      'sensor_type': sensor_type,
-      'sensor_data': str(sensor_data),
-      'board_id': board_id
-    }
-
-    return sensor_data
-
   def publish_status(self, status=None):
     topic = self.mqtt_config.get('topic', {})
     if hasattr(self, 'status') and 'mgmt/status' in topic:
       if status:
         self.status.update(status)
-      self.publish(topic['mgmt/status'], self.status, retain=True)
-
-    if hasattr(self, 'status') and 'mgw/action' in topic:
-      if not status:
+      else:
         status = self.status
-      for key in status:
-        sensor_data = self._create_sensor_data('status_' + key, status[key])
-        self.publish(topic['mgw/action'], sensor_data)
+      for status_name in status:
+        self.publish(topic['mgmt/status'] + '/' + status_name, self.status[status_name], retain=True)
 
   def subscribe(self, topic):
     if isinstance(topic, str) or isinstance(topic, unicode):
@@ -116,8 +101,11 @@ class Mqtt(object):
     else:
       LOG.warning("Fail to subscribe to topic '%s', unknown type", topic)
 
+  def publish_metric(self, topic, payload):
+    mqtt_topic = topic + '/' + payload['sensor_type'] + '/' + payload['board_id']
+    self.publish(mqtt_topic, payload['sensor_data'])
+
   def publish(self, topic, payload, retain=False):
-    payload = json.dumps(payload)
     if self.mqtt._host:
       if topic and payload:
         self.mqtt.publish(topic, payload=payload, retain=retain)

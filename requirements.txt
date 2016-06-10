@@ -9,3 +9,4 @@ paho-mqtt
 sqlalchemy
 tornado
 jsonschema
+jq

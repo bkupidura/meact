@@ -5,6 +5,7 @@ import os
 import pkgutil
 import requests
 import sys
+import time
 
 from jsonschema import Draft4Validator, validators
 from jsonschema.exceptions import ValidationError
@@ -50,7 +51,8 @@ def validate_schema(schema, data):
   try:
     Draft4Validator(schema).validate(data)
   except (ValidationError) as e:
-    LOG.warning('Validation failed: %s', e)
+    LOG.warning("Validation failed for data '%s'", data)
+    LOG.debug("Error '%s'", e)
     return False, None
   else:
     ExtendDefaultDraft4Validator(schema).validate(data)
@@ -63,6 +65,9 @@ def validate_sensor_data(data):
 
 def validate_sensor_config(data):
   return validate_schema(schemas.SCHEMA_SENSOR_CONFIG, data)
+
+def validate_feed_config(data):
+  return validate_schema(schemas.SCHEMA_FEED_CONFIG, data)
 
 
 def create_logger(conf=None):
@@ -142,22 +147,37 @@ def eval_helper(threshold_lambda, arg1=None, arg2=None):
   threshold_func = eval(threshold_lambda)
   threshold_func_arg_number = threshold_func.func_code.co_argcount
 
-  if threshold_func_arg_number == 0:
-    threshold_result = threshold_func()
-  elif threshold_func_arg_number == 1:
-    threshold_result = threshold_func(arg1)
-  elif threshold_func_arg_number == 2:
-    try:
-      threshold_result = threshold_func(arg1, arg2)
-    except (IndexError):
-      LOG.info('Not enough values stored to check threshold')
-      threshold_result = False
+  try:
+    if threshold_func_arg_number == 0:
+      threshold_result = threshold_func()
+    elif threshold_func_arg_number == 1:
+      threshold_result = threshold_func(arg1)
+    elif threshold_func_arg_number == 2:
+      try:
+        threshold_result = threshold_func(arg1, arg2)
+      except (IndexError):
+        LOG.info('Not enough values stored to check threshold')
+        threshold_result = False
+  except Exception as e:
+    LOG.error("Exception '%s' in lambda '%s' args '%s' '%s'", e, threshold_lambda, arg1, arg2)
+    threshold_result = False
+
   return threshold_result
 
-
 def prepare_sensor_data(sensor_data):
-  validation_result, sensor_data = utils.validate_sensor_data(sensor_data)
+  validation_result, sensor_data = validate_sensor_data(sensor_data)
   if not validation_result:
     return None
 
   return sensor_data
+
+
+def prepare_sensor_data_mqtt(mqtt_msg):
+  topic = mqtt_msg.topic.split('/')
+  sensor_data = {
+    'board_id': topic[-1],
+    'sensor_type': topic[-2],
+    'sensor_data': mqtt_msg.payload
+  }
+
+  return prepare_sensor_data(sensor_data)

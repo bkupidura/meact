@@ -8,7 +8,7 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status",
+         "mgmt/status": "mgmt/status/+",
          "srl/write": "srl/write"
        },
        "dbsm/metric": "dbsm/metric"

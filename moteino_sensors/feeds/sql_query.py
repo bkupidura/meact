@@ -1,24 +1,23 @@
-import json
 import logging
 import sys
 
 from jq import jq
 
-from moteino_sensors import utils
 from moteino_sensors import database
 
 
 LOG = logging.getLogger(__name__)
+TIMEOUT=5
 
 
-def sql(feed, feed_result):
+def sql_query(feed_config, feed_result):
   """Get sensor_data from SQL query
 
   """
 
-  LOG.info('Getting feed from SQL')
+  LOG.debug('Getting feed from SQL')
 
-  sql_params = feed['params']
+  sql_params = feed_config['params']
 
   db_string = sql_params['db_string']
   db_query = sql_params['db_query']
@@ -28,8 +27,9 @@ def sql(feed, feed_result):
 
   result = [row.values() for row in raw_result] 
 
-  jq_result = jq(feed['jq_expression']).transform(result, multiple_output=True)
-
+  jq_result = jq(feed_config['expression']).transform(result, multiple_output=True)
   feed_result['sensor_data'] = jq_result
+
+  LOG.debug("Got response from SQL query '%s'", result)
     
   sys.exit(0)
