@@ -33,8 +33,6 @@
       "check_status": [{"name": "armed", "threshold": "lambda x: int(x)==1"}],
       "action_interval": 360,
       "threshold": "lambda x: int(x)==1",
-      "fail_count": 0,
-      "fail_interval": 0,
       "message_template": "Motion detected on board {board_desc} ({board_id})",
       "action_config": {
         "send_bulksms": {
@@ -54,8 +52,6 @@
       "action": [{"name": "send_mail"}, {"name": "log"}],
       "action_interval": 3600,
       "threshold": "lambda x: int(x)<25",
-      "fail_count": 0,
-      "fail_interval": 0,
       "message_template": "Board {board_desc} ({board_id}) was rebooted"
       }
     ]
@@ -68,48 +64,10 @@
       "action_interval": 86400,
       "threshold": "lambda x: int(x)>300",
       "transform": "lambda x: int(time.time()) - int(x)",
-      "fail_count": 0,
-      "fail_interval": 0,
       "message_template": "Board {board_desc} ({board_id}) is missing for {sensor_data} seconds"
       }
     ]
   },
-  "status_armed": {
-    "priority": 10,
-    "actions": [
-      {
-      "action": [{"name": "send_instapush", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
-      "action_interval": 1,
-      "threshold": "lambda x: int(x)==1",
-      "fail_count": 0,
-      "fail_interval": 0,
-      "message_template": "Alarm armed",
-      "action_config": {
-        "send_instapush": {
-          "apps": [
-            {"id": "instapush-app-id", "secret": "instapush-app-secret"}
-            ]
-          }
-        }
-      },
-      {
-      "action": [{"name": "send_instapush", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
-      "action_interval": 1,
-      "threshold": "lambda x: int(x)==0",
-      "fail_count": 0,
-      "fail_interval": 0,
-      "message_template": "Alarm disarmed",
-      "action_config": {
-        "send_instapush": {
-          "apps": [
-            {"id": "instapush-app-id", "secret": "instapush-app-secret"},
-            {"id": "instapush-app-id2", "secret": "instapush-app-secret2"}
-            ]
-          }
-        }
-      }
-    ]
-  }
   "switch": {
     "actions": [
       {
@@ -118,7 +76,7 @@
       "board_ids": ["10"],
       "action_config": {
         "send_mqtt": {
-          "message": ["{board_id}:255"]
+          "message": [{"message": "{board_id}:11", "topic": "srl/write"}]
           }
         }
       },
@@ -130,6 +88,61 @@
       {
       "action": [{"name": "log"}],
       "message_template": "Switch pressed"
+      }
+    ]
+  },
+  "geolocation": {
+    "priority": 10,
+    "actions": [
+      {
+      "action": [{"name": "send_mqtt"}],
+      "action_interval": 30,
+      "threshold": "lambda x: str(x) == 'exit'",
+      "check_metric": [
+        {
+          "sensor_type": "geolocation",
+          "board_ids": ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE", "FFFFFFFF-GGGG-HHHH-IIII-JJJJJJJJJJJJ"],
+          "threshold": "lambda x: len([metric for metric in x if metric.sensor_data == 'exit']) == 2",
+          "value_count": {"type": "LastMetric", "count": 1}
+        }
+      ],
+      "check_status": [{"name": "armed", "threshold": "lambda x: int(x) == 0"}],
+      "action_config": {
+        "send_mqtt": {
+          "message": [{"message": "1", "topic": "mgmt/status/armed", "retain": 1}, {"message": "1", "topic": "mgw/action/armed/geofencing"}]
+          }
+        }
+      },
+      {
+      "action": [{"name": "send_mqtt"}],
+      "action_interval": 30,
+      "board_ids": ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE", "FFFFFFFF-GGGG-HHHH-IIII-JJJJJJJJJJJJ"],
+      "threshold": "lambda x: str(x) == 'enter'",
+      "check_status": [
+        {"name": "armed", "threshold": "lambda x: int(x) == 1"}
+      ],
+      "action_config": {
+        "send_mqtt": {
+          "message": [{"message": "0", "topic": "mgmt/status/armed", "retain": 1}, {"message": "0", "topic": "mgw/action/armed/geofencing"}]
+          }
+        }
+      }
+    ]
+  },
+  "armed": {
+    "priority": 10,
+    "actions": [
+      {
+      "action": [{"name": "send_pushover", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+      "action_interval": 30,
+      "threshold": "lambda x: int(x)==1",
+      "message_template": "Alarm armed"
+      },
+      {
+      "action": [{"name": "send_pushover", "failback": [{"name": "send_mail"}]}, {"name": "log"}],
+      "action_interval": 30,
+      "threshold": "lambda x: int(x)==0",
+      "message_template": "Alarm disarmed"
       }
     ]
   }

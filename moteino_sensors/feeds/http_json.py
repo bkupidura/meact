@@ -12,6 +12,11 @@ TIMEOUT=5
 def http_json(feed_config, feed_result):
   """Get sensor_data from HTTP JSON API
 
+  feed_config = {
+    "url": "http://example.com/api",
+    "auth_user": "user",
+    "auth_pass": "pass"
+  }
   """
 
   LOG.debug('Getting feed from HTTP')
@@ -43,6 +48,11 @@ def http_json(feed_config, feed_result):
     sys.exit(2)
 
   response = utils.load_json(req.text)
+
+  if not response:
+    LOG.warning("No response from '%s'", url)
+    sys.exit(2)
+
   jq_result = jq(feed_config['expression']).transform(response, multiple_output=True)
   feed_result['sensor_data'] = jq_result
 

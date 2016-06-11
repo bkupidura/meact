@@ -21,7 +21,7 @@ class Mqtt(object):
     self.status[status_name] = msg.payload
     if self.name in self.status and hasattr(self, 'enabled'):
       if isinstance(self.enabled, _Event):
-        self.enabled.set() if self.status[self.name] else self.enabled.clear()
+        self.enabled.set() if int(self.status[self.name]) else self.enabled.clear()
       else:
         self.enabled = self.status[self.name]
 
@@ -90,7 +90,13 @@ class Mqtt(object):
       else:
         status = self.status
       for status_name in status:
-        self.publish(topic['mgmt/status'] + '/' + status_name, self.status[status_name], retain=True)
+        status_value = str(self.status[status_name])
+        self.publish(topic['mgmt/status'] + '/' + status_name, status_value, retain=True)
+        if 'mgw/action' in topic:
+          self.publish_metric(topic['mgw/action'], {'sensor_type': 'status_' + status_name,
+            'board_id': self.name,
+            'sensor_data': status_value
+          })
 
   def subscribe(self, topic):
     if isinstance(topic, str) or isinstance(topic, unicode):

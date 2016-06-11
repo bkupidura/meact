@@ -188,7 +188,7 @@ def main():
 
   app.config['db'] = database.connect(app.config['appconfig']['db_string'])
 
-  app.run(host='0.0.0.0', port=8080, debug=app.config['appconfig']['debug'], server='tornado')
+  app.run(host='0.0.0.0', port=8080, server='tornado')
 
 
 if __name__ == "__main__":

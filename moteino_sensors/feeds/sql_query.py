@@ -13,6 +13,10 @@ TIMEOUT=5
 def sql_query(feed_config, feed_result):
   """Get sensor_data from SQL query
 
+  feed_config = {
+    "db_string": "sqlite:////etc/mgw/mgw.db",
+    "db_query": "SELECT board_id,sensor_data FROM last_metrics"
+  }
   """
 
   LOG.debug('Getting feed from SQL')

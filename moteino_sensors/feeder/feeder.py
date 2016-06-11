@@ -85,6 +85,7 @@ class Feeder(mqtt.Mqtt):
         if not self.feeds_status.check_last_feed(feed_name, feed_config['feed_interval']):
           continue
 
+        LOG.info("Geting feeds from '%s'", feed_name)
         feed_result = self._feed_helper(feed_config)
         
         if not feed_result:
