@@ -66,12 +66,12 @@ SCHEMA_DEFINITIONS = {
         },
         "value_count": {
           "type": "object",
-          "default": {"type": "none", "count": 0},
+          "default": {"type": "none", "count": 1},
           "properties": {
             "type": {"$ref": "#/definitions/notEmptyString"},
             "count": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 1
             }
           },
           "required": ["type", "count"]
@@ -106,7 +106,7 @@ SCHEMA_DEFINITIONS = {
               },
               "value_count": {
                 "type": "object",
-                "default": {"type": "none", "count": 0},
+                "default": {"type": "none", "count": 1},
                 "properties": {
                   "type": {"$ref": "#/definitions/notEmptyString"},
                   "count": {

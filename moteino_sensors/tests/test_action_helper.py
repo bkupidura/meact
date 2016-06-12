@@ -9,7 +9,6 @@ from moteino_sensors import utils
 
 default_sensor_config = {
   'priority': 100,
-  'value_count': 1,
   'actions': [
     {
     'check_status': [
@@ -17,7 +16,9 @@ default_sensor_config = {
     ],
     'check_metric': [],
     'action_interval': 0,
+    'value_count': {'type': 'none', 'count': 1},
     'threshold': 'lambda x: True',
+    'transform': 'lambda x: x',
     'fail_count': 0,
     'fail_interval': 0,
     'message_template': 'Template message for {board_id}',
@@ -118,13 +119,13 @@ def test_should_check_status(check_status, expected):
 check_metric_test_data = (
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': 1, 'threshold': 'lambda x: int(x)==1'},
+        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': {'type': 'Metric', 'count': 10}, 'threshold': 'lambda x: int(x)==1'},
     ],
     True
   ),
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': 0, 'threshold': 'lambda x: int(x)==1'}
+        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': {'type': 'LastMetric', 'count': 1}, 'threshold': 'lambda x: int(x)==1'}
     ],
     True
   ),
@@ -295,7 +296,7 @@ board_ids_test_data = (
   ),
   (
     ['test-1'],
-    False
+    True
   ),
   (
     '',
@@ -459,10 +460,54 @@ def test_priority(priority, expected):
 
   assert ada == expected
 
-@pytest.mark.parametrize('value_count, expected', integer_bigger_than_0_test_data)
+value_count_test_data = (
+  (
+    {'type': 'Metric', 'count': 10},
+    True
+  ),
+  (
+    {'type': 'LastMetric', 'count': 1},
+    True
+  ),
+  (
+    {'type': 'LastMetric', 'count': 0},
+    False
+  ),
+  (
+    {'type': 10, 'count': 10},
+    False
+  ),
+  (
+    {'type': 'LastMetric'},
+    False
+  ),
+  (
+    {'count': 10},
+    False
+  ),
+  (
+    {'test': 'test'},
+    False
+  ),
+  (
+    {},
+    False
+  ),
+  (
+    10,
+    False
+  ),
+  (
+    [10],
+    False
+  )
+)
+
+
+@pytest.mark.parametrize('value_count, expected', value_count_test_data)
 def test_value_count(value_count, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['value_count'] = value_count
+  sensor_config['actions'][0]['value_count'] = value_count
 
   ada, data = utils.validate_sensor_config(sensor_config)
 
@@ -646,13 +691,14 @@ default_test_data = (
     },
     {
       "priority": 500,
-      "value_count": 0,
       "actions": [
         {
           "action_interval": 0,
           "check_status": [],
           "check_metric": [],
+          "value_count": {"type": "none", "count": 1},
           "threshold": "lambda: True",
+          "transform": "lambda x: x",
           "fail_count": 0,
           "fail_interval": 600,
           "message_template": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}",
