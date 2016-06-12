@@ -15,6 +15,7 @@ class Srl(mqtt.Mqtt):
     self.name = 'srl'
     self.enabled = Event()
     self.enabled.set()
+    self.status = {'srl': 1}
     self.serial = serial
     self.mqtt_config = mqtt_config
     self._re_sensor_data = re.compile(re_sensor_data)
@@ -56,6 +57,7 @@ class Srl(mqtt.Mqtt):
   def run(self):
     LOG.info('Starting')
     self.loop_start()
+    self.publish_status()
 
     while True:
       self.enabled.wait()

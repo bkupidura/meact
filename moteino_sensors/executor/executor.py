@@ -69,16 +69,16 @@ class ActionStatusAdapter(dict):
 
 
 class Mgw(mqtt.Mqtt):
-  def __init__(self, db_string, sensors_map_file, action_config, mqtt_config, status):
+  def __init__(self, db_string, sensors_map_file, action_config, mqtt_config):
     super(Mgw, self).__init__()
     self.name = 'mgw'
     self.enabled = Event()
     self.enabled.set()
+    self.status = {'mgw': 1, 'armed': 1}
     self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
     self.action_config = action_config
     self.mqtt_config = mqtt_config
-    self.status = status
     self.action_queue = Queue.PriorityQueue()
 
     signal.signal(signal.SIGHUP, self._handle_signal)
@@ -326,8 +326,7 @@ def main():
     db_string=conf['db_string'],
     sensors_map_file=sensors_map_file,
     action_config=conf['action_config'],
-    mqtt_config=conf['mqtt'],
-    status=conf['status'])
+    mqtt_config=conf['mqtt'])
 
   mgw.run()
 

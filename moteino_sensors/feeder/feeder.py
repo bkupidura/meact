@@ -29,6 +29,7 @@ class Feeder(mqtt.Mqtt):
     self.name = 'feeder'
     self.enabled = Event()
     self.enabled.set()
+    self.status = {'feeder': 1}
     self.mqtt_config = conf['mqtt']
     self.feeds_status = FeedsStatusAdapter()
     self.start_mqtt()
@@ -44,6 +45,7 @@ class Feeder(mqtt.Mqtt):
 
       if validation_result:
         self.feeds_map[feed_name] = feed_config
+        self.status[self.name + '/' + feed_name] = 1
 
   def _feed_helper(self, feed_config):
     feed_name = feed_config['name']
@@ -75,12 +77,17 @@ class Feeder(mqtt.Mqtt):
   def run(self):
     LOG.info('Starting')
     self.loop_start()
+    self.publish_status()
     while True:
       self.enabled.wait()
       for feed_name in self.feeds_map:
         feed_config = self.feeds_map[feed_name]
+        feed_enabled = int(self.status.get(self.name + '/' + feed_name, 1))
 
         self.feeds_status.build_defaults(feed_name)
+
+        if not feed_enabled:
+          continue
 
         if not self.feeds_status.check_last_feed(feed_name, feed_config['feed_interval']):
           continue

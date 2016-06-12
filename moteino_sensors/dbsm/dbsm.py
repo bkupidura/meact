@@ -16,6 +16,7 @@ class Dbsm(mqtt.Mqtt):
     self.name = 'dbsm'
     self.enabled = Event()
     self.enabled.set()
+    self.status = {'dbsm': 1}
     self.db = database.connect(db_string)
     self.mqtt_config = mqtt_config
     self.metric_queue = Queue.Queue()
@@ -31,6 +32,7 @@ class Dbsm(mqtt.Mqtt):
   def run(self):
     LOG.info('Starting')
     self.loop_start()
+    self.publish_status()
     while True:
       self.enabled.wait()
       try:

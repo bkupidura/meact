@@ -8,10 +8,11 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status/+",
+         "mgmt/status": "mgmt/status/#",
          "srl/write": "srl/write"
        },
-       "dbsm/metric": "dbsm/metric"
+       "dbsm/metric": "dbsm/metric",
+       "mgmt/status": "mgmt/status"
     }
   },
   "re_sensor_data": "\\[(?P<board_id>.+)\\]\\[(?P<sensor_type>.+):(?P<sensor_data>.+)\\]"

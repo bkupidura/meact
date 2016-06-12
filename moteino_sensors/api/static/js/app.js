@@ -15,6 +15,7 @@ dashboardApp.constant('dashboardConfig', {
   },
   status: {
     'service': ['dbsm', 'srl', 'mgw', 'feeder'],
+    'feeder': ['feeder/msd', 'feeder/fencing'],
     'general': ['armed']
   },
   graphs: {

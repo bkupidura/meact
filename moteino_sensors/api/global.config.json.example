@@ -6,7 +6,7 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status/+"
+         "mgmt/status": "mgmt/status/#"
        },
        "mgmt/status": "mgmt/status",
        "mgw/action": "mgw/action"

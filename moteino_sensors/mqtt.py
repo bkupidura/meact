@@ -17,8 +17,14 @@ class Mqtt(object):
     super(Mqtt, self).__init__()
 
   def _on_mgmt_status(self, client, userdata, msg):
-    status_name = msg.topic.split('/')[2]
+    status_topic = self.mqtt_config['topic'].get('mgmt/status')
+    if not status_topic:
+      return
+
+    #Remove 'mgmt/status/' from topic
+    status_name = msg.topic[len(status_topic)+1:]
     self.status[status_name] = msg.payload
+
     if self.name in self.status and hasattr(self, 'enabled'):
       if isinstance(self.enabled, _Event):
         self.enabled.set() if int(self.status[self.name]) else self.enabled.clear()
@@ -97,6 +103,8 @@ class Mqtt(object):
             'board_id': self.name,
             'sensor_data': status_value
           })
+    else:
+      LOG.warning('Status topic unknown, not publishing')
 
   def subscribe(self, topic):
     if isinstance(topic, str) or isinstance(topic, unicode):

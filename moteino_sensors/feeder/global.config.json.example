@@ -6,10 +6,11 @@
     "server": "localhost",
     "topic": {
       "subscribe": {
-         "mgmt/status": "mgmt/status/+"
+         "mgmt/status": "mgmt/status/#"
        },
        "mgw/action": "mgw/action",
-       "dbsm/metric": "dbsm/metric"
+       "dbsm/metric": "dbsm/metric",
+       "mgmt/status": "mgmt/status"
     }
   }
 }
