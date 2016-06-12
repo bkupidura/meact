@@ -96,7 +96,7 @@ class Mqtt(object):
       else:
         status = self.status
       for status_name in status:
-        status_value = str(self.status[status_name])
+        status_value = self.status[status_name]
         self.publish(topic['mgmt/status'] + '/' + status_name, status_value, retain=True)
         if 'mgw/action' in topic:
           self.publish_metric(topic['mgw/action'], {'sensor_type': 'status_' + status_name,
@@ -121,9 +121,9 @@ class Mqtt(object):
 
   def publish(self, topic, payload, retain=False):
     if self.mqtt._host:
-      if topic and payload:
+      if topic:
         self.mqtt.publish(topic, payload=payload, retain=retain)
       else:
-        LOG.warning('Topic or payload is empty')
+        LOG.warning('Topic is empty')
     else:
       LOG.warning('Client is not connected to broker')

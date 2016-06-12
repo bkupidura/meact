@@ -174,10 +174,14 @@ def prepare_sensor_data(sensor_data):
 
 def prepare_sensor_data_mqtt(mqtt_msg):
   topic = mqtt_msg.topic.split('/')
-  sensor_data = {
-    'board_id': topic[-1],
-    'sensor_type': topic[-2],
-    'sensor_data': mqtt_msg.payload
-  }
+  try:
+    sensor_data = {
+      'board_id': topic[-1],
+      'sensor_type': topic[-2],
+      'sensor_data': mqtt_msg.payload
+    }
+  except IndexError:
+    LOG.warning("Cant prepare sensor_data from '%s'", mqtt_msg)
+    return None
 
   return prepare_sensor_data(sensor_data)
