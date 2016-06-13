@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 
@@ -47,9 +48,9 @@ def http_json(feed_config, feed_result):
     LOG.warning("Fail to get feeds from '%s'", url)
     sys.exit(2)
 
-  response = utils.load_json(req.text)
-
-  if not response:
+  try:
+    response = json.loads(req.text)
+  except (ValueError, TypeError):
     LOG.warning("No response from '%s'", url)
     sys.exit(2)
 

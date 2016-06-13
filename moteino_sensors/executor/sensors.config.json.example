@@ -145,5 +145,29 @@
       "message_template": "Alarm disarmed"
       }
     ]
+  },
+  "sunset": {
+    "priority": 100,
+    "actions": [
+      {
+      "action": [{"name": "log"}],
+      "transform": "lambda x: int(x) - int(time.time())",
+      "action_interval": 3600,
+      "threshold": "lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600",
+      "message_template": "Sunset in 1h"
+      }
+    ]
+  },
+  "sunrise": {
+    "priority": 100,
+    "actions": [
+      {
+      "action": [{"name": "log"}],
+      "transform": "lambda x: int(x) - int(time.time())",
+      "action_interval": 3600,
+      "threshold": "lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600",
+      "message_template": "Sunrise in 1h"
+      }
+    ]
   }
 }

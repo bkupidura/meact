@@ -3,10 +3,36 @@ SCHEMA_DEFINITIONS = {
     "type": "string",
     "minLength": 1
   },
+  "positiveInteger": {
+    "minimum": 0,
+    "type": "integer"
+  },
   "boardID": {
     "type": "string",
     "minLength": 1,
     "pattern": "^[a-zA-Z0-9\-]+$"
+  },
+  "boardIDs": {
+    "type": "array",
+    "uniqueItems": True,
+    "items": {"$ref": "#/definitions/boardID"}
+  },
+  "valueCount": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "type": {"$ref": "#/definitions/notEmptyString"},
+          "count": {"$ref": "#/definitions/positiveInteger"}
+        },
+        "required": ["type", "count"]
+      },
+      {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+      }
+    ]
   },
   "action": {
     "type": "array",
@@ -28,58 +54,17 @@ SCHEMA_DEFINITIONS = {
     "items": {
       "type": "object",
       "properties": {
-        "action_interval": {
-          "minimum": 0,
-          "type": "integer",
-          "default": 0
-        },
-        "fail_count": {
-          "minimum": 0,
-          "type": "integer",
-          "default": 0
-        },
-        "fail_interval": {
-          "minimum": 0,
-          "type": "integer",
-          "default": 600
-        },
-        "message_template": {
-          "type": "string",
-          "minLength": 1,
-          "default": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}"
-        },
-        "threshold": {
-          "type": "string",
-          "minLength": 1,
-          "default": "lambda: True"
-        },
-        "transform": {
-          "type": "string",
-          "minLength": 1,
-          "default": "lambda x: x"
-        },
-        "board_ids": {
-          "type": "array",
-          "uniqueItems": True,
-          "default": [],
-          "items": {"$ref": "#/definitions/boardID"}
-        },
-        "value_count": {
-          "type": "object",
-          "default": {"type": "none", "count": 1},
-          "properties": {
-            "type": {"$ref": "#/definitions/notEmptyString"},
-            "count": {
-              "type": "integer",
-              "minimum": 1
-            }
-          },
-          "required": ["type", "count"]
-        },
+        "action_interval": {"$ref": "#/definitions/positiveInteger"},
+        "fail_count": {"$ref": "#/definitions/positiveInteger"},
+        "fail_interval": {"$ref": "#/definitions/positiveInteger"},
+        "message_template": {"$ref": "#/definitions/notEmptyString"},
+        "threshold": {"$ref": "#/definitions/notEmptyString"},
+        "value_count": {"$ref": "#/definitions/valueCount"},
+        "board_ids": {"$ref": "#/definitions/boardIDs"},
+        "transform": {"type": "string"},
         "check_status": {
           "type": "array",
           "uniqueItems": True,
-          "default": [],
           "items": {
             "type": "object",
             "properties": {
@@ -92,42 +77,26 @@ SCHEMA_DEFINITIONS = {
         "check_metric": {
           "type": "array",
           "uniqueItems": True,
-          "default": [],
           "items": {
             "type": "object",
             "properties": {
               "sensor_type": {"$ref": "#/definitions/notEmptyString"},
               "threshold": {"$ref": "#/definitions/notEmptyString"},
-              "board_ids": {
-                "type": "array",
-                "uniqueItems": True,
-                "default": [],
-                "items": {"$ref": "#/definitions/boardID"}
-              },
-              "value_count": {
-                "type": "object",
-                "default": {"type": "none", "count": 1},
-                "properties": {
-                  "type": {"$ref": "#/definitions/notEmptyString"},
-                  "count": {
-                    "type": "integer",
-                    "minimum": 1
-                  }
-                },
-                "required": ["type", "count"]
-              }
+              "board_ids": {"$ref": "#/definitions/boardIDs"},
+              "value_count": {"$ref": "#/definitions/valueCount"}
             },
-            "required": ["sensor_type", "threshold"]
+            "required": ["sensor_type", "threshold", "board_ids", "value_count"]
           }
         },
         "action_config": {
           "type": "object",
-          "default": {},
           "additionalProperties": {"type": "object"}
         },
         "action": {"$ref": "#/definitions/action"}
       },
-      "required": ["action"]
+      "required": ["action", "action_interval", "fail_count", "fail_interval",
+          "message_template", "threshold", "transform", "value_count",
+          "board_ids", "check_status", "check_metric", "action_config"]
     }
   }
 }
@@ -151,14 +120,10 @@ SCHEMA_SENSOR_CONFIG = {
   "definitions": SCHEMA_DEFINITIONS,
   "type": "object",
   "properties": {
-    "priority": {
-      "minimum": 0,
-      "type": "integer",
-      "default": 500
-    },
+    "priority": {"$ref": "#/definitions/positiveInteger"},
     "actions": {"$ref": "#/definitions/actions"}
   },
-  "required": ["actions"]
+  "required": ["priority", "actions"]
 }
 
 SCHEMA_FEED_CONFIG = {
@@ -168,16 +133,16 @@ SCHEMA_FEED_CONFIG = {
     "name": {"$ref": "#/definitions/notEmptyString"},
     "expression": {"$ref": "#/definitions/notEmptyString"},
     "mqtt_topic": {"$ref": "#/definitions/notEmptyString"},
-    "feed_interval": {
-      "minimum": 0,
-      "type": "integer",
-      "default": 600
-    },
-    "params": {
-      "type": "object",
-      "default": {},
-      "additionalProperties": {"$ref": "#/definitions/notEmptyString"}
-    }
+    "feed_interval": {"$ref": "#/definitions/positiveInteger"},
+    "fail_interval": {"$ref": "#/definitions/positiveInteger"},
+    "params": {"type": "object"}
   },
-  "required": ["name", "expression", "mqtt_topic"]
+  "required": [
+      "name",
+      "expression",
+      "mqtt_topic",
+      "feed_interval",
+      "fail_interval",
+      "params"
+  ]
 }

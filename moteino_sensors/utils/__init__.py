@@ -7,7 +7,7 @@ import requests
 import sys
 import time
 
-from jsonschema import Draft4Validator, validators
+from jsonschema import Draft4Validator
 from jsonschema.exceptions import ValidationError
 
 from moteino_sensors import actions
@@ -28,26 +28,7 @@ def load_config(config_name):
   return config
 
 
-def extend_with_default(validator_class):
-  validate_properties = validator_class.VALIDATORS["properties"]
-
-  def set_defaults(validator, properties, instance, schema):
-    for property, subschema in properties.iteritems():
-      if "default" in subschema:
-        instance.setdefault(property, subschema["default"])
-
-    for error in validate_properties(
-      validator, properties, instance, schema,
-    ):
-      yield error
-
-  return validators.extend(
-    validator_class, {"properties" : set_defaults},
-  )
-
-
 def validate_schema(schema, data):
-  ExtendDefaultDraft4Validator = extend_with_default(Draft4Validator)
   try:
     Draft4Validator(schema).validate(data)
   except (ValidationError) as e:
@@ -55,7 +36,6 @@ def validate_schema(schema, data):
     LOG.debug("Error '%s'", e)
     return False, None
   else:
-    ExtendDefaultDraft4Validator(schema).validate(data)
     return True, data
 
 
@@ -64,9 +44,32 @@ def validate_sensor_data(data):
 
 
 def validate_sensor_config(data):
+  try:
+    data.setdefault('priority', 500)
+    for action in data.get('actions', {}):
+      action.setdefault('action_interval', 0)
+      action.setdefault('fail_count', 0)
+      action.setdefault('fail_interval', 600)
+      action.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
+      action.setdefault('threshold', 'lambda: True')
+      action.setdefault('transform', '')
+      action.setdefault('board_ids', [])
+      action.setdefault('check_metric', [])
+      action.setdefault('check_status', [])
+      action.setdefault('value_count', {})
+      action.setdefault('action_config', {})
+  except (AttributeError, TypeError):
+    pass
   return validate_schema(schemas.SCHEMA_SENSOR_CONFIG, data)
 
+
 def validate_feed_config(data):
+  try:
+    data.setdefault('feed_interval', 600)
+    data.setdefault('fail_interval', 300)
+    data.setdefault('params', {})
+  except (AttributeError, TypeError):
+    pass
   return validate_schema(schemas.SCHEMA_FEED_CONFIG, data)
 
 
@@ -106,13 +109,6 @@ def http_request(url, method='GET', params=None, data=None, auth=None, headers=N
     return None
 
   return req
-
-
-def load_json(data):
-  try:
-    return json.loads(data)
-  except (ValueError, TypeError) as e:
-    return {}
 
 
 def load_actions():

@@ -10,7 +10,10 @@ from moteino_sensors import utils
 
 class FeedsStatusAdapter(dict):
   def build_defaults(self, feed_name):
-    self.setdefault(feed_name, {'last_feed': 0})
+    self.setdefault(feed_name, {
+      'last_feed': 0,
+      'last_fail': 0
+    })
 
   def check_last_feed(self, feed_name, feed_interval):
     now = int(time.time())
@@ -19,9 +22,20 @@ class FeedsStatusAdapter(dict):
       return False
     return True
 
+  def check_last_fail(self, feed_name, fail_interval):
+    now = int(time.time())
+    last_fail = self[feed_name]['last_fail']
+    if now - last_fail <= fail_interval:
+      return False
+    return True
+
   def update_last_feed(self, feed_name):
     now = int(time.time())
     self[feed_name]['last_feed'] = now
+
+  def update_last_fail(self, feed_name):
+    now = int(time.time())
+    self[feed_name]['last_fail'] = now
 
 class Feeder(mqtt.Mqtt):
   def __init__(self, conf, feeds_map_file):
@@ -92,14 +106,19 @@ class Feeder(mqtt.Mqtt):
         if not self.feeds_status.check_last_feed(feed_name, feed_config['feed_interval']):
           continue
 
-        LOG.info("Geting feeds from '%s'", feed_name)
+        if not self.feeds_status.check_last_fail(feed_name, feed_config['fail_interval']):
+          continue
+
+        LOG.debug("Geting feeds from '%s'", feed_name)
         feed_result = self._feed_helper(feed_config)
         
         if not feed_result:
+          self.feeds_status.update_last_fail(feed_name)
           continue
+        else:
+          self.feeds_status.update_last_feed(feed_name)
 
         LOG.debug("Got feed provider response '%s'", feed_result)
-        self.feeds_status.update_last_feed(feed_name)
 
         for sensor_data in feed_result:
           sensor_data = utils.prepare_sensor_data(sensor_data)

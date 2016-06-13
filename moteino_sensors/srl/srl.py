@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from threading import Event
+import json
 import logging
 import re
 import time
@@ -22,9 +23,11 @@ class Srl(mqtt.Mqtt):
     self.start_mqtt()
 
   def _on_message(self, client, userdata, msg):
-    data = utils.load_json(msg.payload)
-    if not data:
+    try:
+      data = json.loads(msg.payload)
+    except (ValueError, TypeError):
       data = msg.payload
+
     data = str(data)
 
     LOG.debug("Got data for serial '%s'", data)

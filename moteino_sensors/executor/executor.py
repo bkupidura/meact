@@ -190,6 +190,22 @@ class Mgw(mqtt.Mqtt):
 
     return result
 
+  def _get_value_count(self, value_count=None, board_ids=None, sensor_type=None):
+    metrics = []
+    if value_count:
+      if value_count['type'] == 'Metric':
+        metrics = database.get_metrics(self.db,
+                board_ids=board_ids,
+                sensor_type=sensor_type,
+                last_available=value_count['count'])
+
+      elif value_count['type'] == 'LastMetric':
+        metrics = database.get_last_metrics(self.db,
+                board_ids=board_ids,
+                sensor_type=sensor_type)
+
+    return metrics
+
   def _action_helper(self, sensor_data, sensor_config, action_config=None):
 
     LOG.debug("Action helper '%s' '%s'", sensor_data, sensor_config['actions'])
@@ -211,8 +227,10 @@ class Mgw(mqtt.Mqtt):
         continue
 
       #Transform sensor_data
-      sensor_data['sensor_data'] = utils.eval_helper(sensor_action['transform'],
-              sensor_data['sensor_data'])
+      transform_threshold = sensor_action.get('transform')
+      if transform_threshold:
+        sensor_data['sensor_data'] = utils.eval_helper(transform_threshold,
+                sensor_data['sensor_data'])
 
       #Format message
       try:
@@ -222,13 +240,9 @@ class Mgw(mqtt.Mqtt):
         continue
 
       #Get historical metrics if needed
-      if sensor_action['value_count']['type'] == 'Metric':
-        metrics = database.get_metrics(self.db,
-                board_ids=sensor_data['board_id'],
-                sensor_type=sensor_data['sensor_type'],
-                last_available=sensor_action['value_count']['count'])
-      else:
-        metrics = []
+      metrics = self._get_value_count(sensor_action['value_count'],
+              sensor_data['board_id'],
+              sensor_data['sensor_type'])
 
       #Check threshold function
       threshold_result = utils.eval_helper(sensor_action['threshold'],
@@ -252,17 +266,9 @@ class Mgw(mqtt.Mqtt):
       #Check metrics threshold function
       check_metric_result = True
       for check_metric in sensor_action['check_metric']:
-        if check_metric['value_count']['type'] == 'Metric':
-          metrics = database.get_metrics(self.db,
-                  board_ids=check_metric['board_ids'],
-                  sensor_type=check_metric['sensor_type'],
-                  last_available=check_metric['value_count']['count'])
-        elif check_metric['value_count']['type'] == 'LastMetric':
-          metrics = database.get_last_metrics(self.db,
-                  board_ids=check_metric['board_ids'],
-                  sensor_type=check_metric['sensor_type'])
-        else:
-          metrics = []
+        metrics = self._get_value_count(check_metric['value_count'],
+                check_metric['board_ids'],
+                check_metric['sensor_type'])
 
         check_metric_result = utils.eval_helper(check_metric['threshold'],
                 metrics)

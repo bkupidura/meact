@@ -7,6 +7,7 @@ import pytest
 from moteino_sensors.executor import executor
 from moteino_sensors import utils
 
+
 default_sensor_config = {
   'priority': 100,
   'actions': [
@@ -16,9 +17,9 @@ default_sensor_config = {
     ],
     'check_metric': [],
     'action_interval': 0,
-    'value_count': {'type': 'none', 'count': 1},
+    'value_count': {},
     'threshold': 'lambda x: True',
-    'transform': 'lambda x: x',
+    'transform': '',
     'fail_count': 0,
     'fail_interval': 0,
     'message_template': 'Template message for {board_id}',
@@ -471,7 +472,11 @@ value_count_test_data = (
   ),
   (
     {'type': 'LastMetric', 'count': 0},
-    False
+    True
+  ),
+  (
+    {},
+    True
   ),
   (
     {'type': 10, 'count': 10},
@@ -487,10 +492,6 @@ value_count_test_data = (
   ),
   (
     {'test': 'test'},
-    False
-  ),
-  (
-    {},
     False
   ),
   (
@@ -696,9 +697,9 @@ default_test_data = (
           "action_interval": 0,
           "check_status": [],
           "check_metric": [],
-          "value_count": {"type": "none", "count": 1},
+          "value_count": {},
           "threshold": "lambda: True",
-          "transform": "lambda x: x",
+          "transform": "",
           "fail_count": 0,
           "fail_interval": 600,
           "message_template": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}",
