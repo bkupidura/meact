@@ -109,7 +109,7 @@
       "check_status": [{"name": "armed", "threshold": "lambda x: int(x) == 0"}],
       "action_config": {
         "send_mqtt": {
-          "message": [{"message": "1", "topic": "mgmt/status/armed", "retain": 1}, {"message": "1", "topic": "mgw/action/armed/geofencing"}]
+          "message": [{"message": "1", "topic": "mgmt/status/armed", "retain": 1}, {"message": "1", "topic": "executor/metric/status_armed/geofencing"}]
           }
         }
       },
@@ -123,13 +123,13 @@
       ],
       "action_config": {
         "send_mqtt": {
-          "message": [{"message": "0", "topic": "mgmt/status/armed", "retain": 1}, {"message": "0", "topic": "mgw/action/armed/geofencing"}]
+          "message": [{"message": "0", "topic": "mgmt/status/armed", "retain": 1}, {"message": "0", "topic": "executor/metric/status_armed/geofencing"}]
           }
         }
       }
     ]
   },
-  "armed": {
+  "status_armed": {
     "priority": 10,
     "actions": [
       {

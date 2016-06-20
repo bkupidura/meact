@@ -51,11 +51,11 @@
     "topic": {
       "subscribe": {
          "mgmt/status": "mgmt/status/#",
-         "mgw/action": "mgw/action/+/+",
+         "executor/metric": "executor/metric/+/+",
          "dbsm/metric": "dbsm/metric/+/+"
        },
        "mgmt/status": "mgmt/status",
-       "mgw/action": "mgw/action"
+       "executor/metric": "executor/metric"
     }
   },
   "db_string": "sqlite:////etc/mgw/mgw.db"

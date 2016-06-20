@@ -98,8 +98,8 @@ class Mqtt(object):
       for status_name in status:
         status_value = self.status[status_name]
         self.publish(topic['mgmt/status'] + '/' + status_name, status_value, retain=True)
-        if 'mgw/action' in topic:
-          self.publish_metric(topic['mgw/action'], {'sensor_type': 'status_' + status_name,
+        if 'executor/metric' in topic:
+          self.publish_metric(topic['executor/metric'], {'sensor_type': 'status_' + status_name,
             'board_id': self.name,
             'sensor_data': status_value
           })
