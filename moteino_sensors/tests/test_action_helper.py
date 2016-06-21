@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from moteino_sensors.executor import executor
+from moteino_sensors import executor
 from moteino_sensors import utils
 
 

@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from moteino_sensors.executor import executor
+from moteino_sensors import executor
 
 board_id = '1'
 sensor_type = 'test'
