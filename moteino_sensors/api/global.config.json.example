@@ -8,8 +8,7 @@
       "subscribe": {
          "mgmt/status": "mgmt/status/#"
        },
-       "mgmt/status": "mgmt/status",
-       "executor/metric": "executor/metric"
+       "mgmt/status": "mgmt/status"
     }
   }
 }

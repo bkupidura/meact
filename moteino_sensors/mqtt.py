@@ -88,6 +88,15 @@ class Mqtt(object):
     self.mqtt.loop_start()
     self.mqtt._thread.setName(self.name+'-mqtt')
 
+  def subscribe(self, topic):
+    if isinstance(topic, str) or isinstance(topic, unicode):
+      self.mqtt.subscribe(str(topic))
+    elif isinstance(topic, list):
+      for t in topic:
+        self.mqtt.subscribe(str(t))
+    else:
+      LOG.warning("Fail to subscribe to topic '%s', unknown type", topic)
+
   def publish_status(self, status=None):
     topic = self.mqtt_config.get('topic', {})
     if hasattr(self, 'status') and 'mgmt/status' in topic:
@@ -98,22 +107,8 @@ class Mqtt(object):
       for status_name in status:
         status_value = self.status[status_name]
         self.publish(topic['mgmt/status'] + '/' + status_name, status_value, retain=True)
-        if 'executor/metric' in topic:
-          self.publish_metric(topic['executor/metric'], {'sensor_type': 'status_' + status_name,
-            'board_id': self.name,
-            'sensor_data': status_value
-          })
     else:
       LOG.warning('Status topic unknown, not publishing')
-
-  def subscribe(self, topic):
-    if isinstance(topic, str) or isinstance(topic, unicode):
-      self.mqtt.subscribe(str(topic))
-    elif isinstance(topic, list):
-      for t in topic:
-        self.mqtt.subscribe(str(t))
-    else:
-      LOG.warning("Fail to subscribe to topic '%s', unknown type", topic)
 
   def publish_metric(self, topic, payload):
     mqtt_topic = topic + '/' + payload['sensor_type'] + '/' + payload['board_id']

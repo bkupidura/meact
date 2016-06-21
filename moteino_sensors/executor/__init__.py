@@ -120,6 +120,24 @@ class Mgw(mqtt.Mqtt):
     boards = database.get_boards(db)
     self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
 
+  def _on_mgmt_status(self, client, userdata, msg):
+    super(Mgw, self)._on_mgmt_status(client, userdata, msg)
+
+    status_topic = self.mqtt_config['topic'].get('mgmt/status')
+    metric_topic = self.mqtt_config['topic'].get('executor/metric')
+
+    if not status_topic or not metric_topic:
+      return
+
+    status_name = msg.topic[len(status_topic)+1:]
+
+    sensor_data = {
+      'sensor_type': status_name,
+      'board_id': self.name,
+      'sensor_data': msg.payload
+    }
+    self.publish_metric(metric_topic, sensor_data)
+
   def _on_message(self, client, userdata, msg):
     sensor_data, sensor_config = self._prepare_data(msg)
 
