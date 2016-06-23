@@ -10,3 +10,4 @@ sqlalchemy
 tornado==4.3
 jsonschema==2.5.1
 jq==0.1.6
+PyYAML==3.11
