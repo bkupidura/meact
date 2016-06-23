@@ -1,18 +1,38 @@
 <div class="status-wrapper">
   <h3>Service status</h3>
   <div ng-repeat="s in status | filter:{type:'service'}">
-    <div class="col-sm-4 margin">{{s['name']}}</div>
-    <div class="col-sm-8 margin">
-      <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-model="radioModel" ng-click="changeStatus(s['name'])">Enabled</label>
-      <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-model="radioModel" ng-click="changeStatus(s['name'])">Disabled</label>
+    <div ng-switch="s['name']">
+      <div ng-switch-when="feeder">
+          <div class="col-sm-4 margin">
+            <div class="pointer" ng-click="showDetail[s['name']] = !showDetail[s['name']]">{{s['name']}}</div>
+          </div>
+          <div class="col-sm-8 margin">
+            <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-click="changeStatus(s['name'])">Enabled</label>
+            <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-click="changeStatus(s['name'])">Disabled</label>
+          </div>
+          <span ng-repeat="sub in status | filter:{type:'feeder'}" ng-show="showDetail[s['name']]">
+            <div class="col-sm-4 margin">{{sub['name']}}</div>
+            <div class="col-sm-8 margin">
+              <button class="btn btn-success btn-xs" ng-if="sub['value'] == 1" ng-click="changeStatus(sub['name'])">Enabled</button>
+              <button class="btn btn-warning btn-xs" ng-if="sub['value'] == 0" ng-click="changeStatus(sub['name'])">Disabled</button>
+            </div>
+          </span>
+      </div>
+      <div ng-switch-default>
+        <div class="col-sm-4 margin">{{s['name']}}</div>
+        <div class="col-sm-8 margin">
+          <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-click="changeStatus(s['name'])">Enabled</label>
+          <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-click="changeStatus(s['name'])">Disabled</label>
+        </div>
+      </div>
     </div>
   </div>
   <h3>Status</h3>
   <div ng-repeat="s in status | filter:{type:'general'}">
     <div class="col-sm-4 margin">{{s['name']}}</div>
     <div class="col-sm-8 margin">
-      <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-model="radioModel" ng-click="changeStatus(s['name'])">True</label>
-      <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-model="radioModel" ng-click="changeStatus(s['name'])">False</label>
+      <label class="btn btn-success btn-xs" ng-if="s['value'] == 1" ng-click="changeStatus(s['name'])">True</label>
+      <label class="btn btn-warning btn-xs" ng-if="s['value'] == 0" ng-click="changeStatus(s['name'])">False</label>
     </div>
   </div>
 </div>

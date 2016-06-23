@@ -9,6 +9,7 @@ dashboardControllers.controller('StatusCtrl', ['$scope', '$interval', 'dashboard
   function ($scope, $interval, dashboardConfig, StatusService) {
 
     $scope.timers = Array();
+    $scope.showDetail = {}
 
     updateStatus = function(){
       StatusService.getStatus().then(function(data) {

@@ -37,10 +37,19 @@ def send_pushover(data, action_config):
   }
 
   req = utils.http_request(url, method='POST', data=params)
-  response = utils.load_json(req.text)
 
-  if not req or not response.get('status'):
+  if not req:
     LOG.warning('Fail to send notification via pushover.net')
     sys.exit(2)
-    
+
+  try:
+    response = json.loads(req.text)
+  except (ValueError, TypeError):
+    LOG.warning('Fail to send notification via pushover.net')
+    sys.exit(2)
+
+  if not response.get('status'):
+    LOG.warning('Fail to send notification via pushover.net')
+    sys.exit(2)
+
   sys.exit(0)

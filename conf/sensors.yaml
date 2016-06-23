@@ -1,0 +1,232 @@
+ping_gw:
+  priority: 10
+  actions:
+    - action:
+        - name: 'send_sms_at'
+          failback:
+            - name: 'send_sms_at'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)==0'
+      fail_count: 2
+      fail_interval: 3600
+      message_template: 'Problem with gateway connection {board_desc} ({board_id})'
+      action_config:
+        send_sms_at:
+          recipient:
+            - '+48000000000'
+
+ping_internet:
+  priority: 10
+  actions:
+    - action:
+        - name: 'send_sms_at'
+          failback:
+            - name: 'send_sms_at'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)==0'
+      fail_count: 2
+      fail_interval: 3600
+      message_template: 'Problem with internet connection {board_desc} ({board_id})'
+      action_config:
+        send_sms_at:
+          recipient:
+            - '+48000000000'
+
+power:
+  priority: 10
+  actions:
+    - action:
+        - name: 'send_sms_at'
+          failback:
+            - name: 'send_sms_at'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)==0'
+      message_template: 'Problem with power supply {board_desc} ({board_id})'
+      action_config:
+        send_sms_at:
+          recipient:
+            - '+48000000000'
+
+voltage:
+  priority: 50
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      action_interval: 7200
+      threshold: 'lambda x: float(x)<3.15'
+      fail_count: 2
+      fail_interval: 300
+      message_template: 'Board {board_desc} ({board_id}) reports low voltage {sensor_data}V'
+
+failedreport:
+  priority: 50
+  actions:
+    - action:
+        - name: 'send_mail'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)>0'
+      message_template: 'Board {board_desc} ({board_id}) failed reports {sensor_data}'
+
+rssi:
+  priority: 50
+  actions:
+    - action:
+        - name: 'send_mail'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)<-95'
+      fail_count: 3
+      fail_interval: 1200
+      message_template: 'Board {board_desc} ({board_id}) low RSSI {sensor_data}'
+
+motion:
+  priority: 0
+  actions:
+    - action:
+        - name: 'send_sms_at'
+          failback:
+            - name: 'send_bulksms'
+              failback:
+                - name: 'send_mail'
+        - name: 'log'
+      check_status:
+        - name: 'armed'
+          threshold: 'lambda x: int(x)==1'
+      action_interval: 360
+      threshold: 'lambda x: int(x)==1'
+      message_template: 'Motion detected on board {board_desc} ({board_id})'
+      action_config:
+        send_sms_at:
+          recipient:
+            - "+48000000000"
+        send_bulksms:
+          recipient:
+            - "+48000000000"
+
+uptime:
+  priority: 50
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      action_interval: 3600
+      threshold: 'lambda x: int(x)<25'
+      message_template: 'Board {board_desc} ({board_id}) was rebooted'
+
+msd:
+  priority: 20
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      action_interval: 86400
+      board_ids:
+        - '1'
+        - '10'
+        - '11'
+        - '12'
+      threshold: 'lambda x: int(x)>300'
+      transform: 'lambda x: int(time.time()) - int(x)'
+      message_template: 'Board {board_desc} ({board_id}) is missing for {sensor_data} seconds'
+
+geolocation:
+  priority: 10
+  actions:
+    - action:
+        - name: 'send_mqtt'
+      action_interval: 30
+      threshold: "lambda x: str(x) == 'exit'"
+      check_metric:
+        - sensor_type: 'geolocation'
+          board_ids:
+            - 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA'
+            - 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB'
+          threshold: "lambda x: len([metric for metric in x if metric.sensor_data == 'exit']) == 2"
+          value_count:
+            type: "LastMetric"
+            count: 1
+      check_status:
+        - name: 'armed'
+          threshold: 'lambda x: int(x) == 0'
+      action_config:
+        send_mqtt:
+          message:
+            - message: '1'
+              topic: 'mgmt/status/armed'
+              retain: 1
+
+    - action:
+        - name: "send_mqtt"
+      action_interval: 30
+      board_ids:
+        - 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA'
+        - 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB'
+      threshold: "lambda x: str(x) == 'enter'"
+      check_status:
+        - name: "armed"
+          threshold: "lambda x: int(x) == 1"
+      action_config:
+        send_mqtt:
+          message:
+            - message: '0'
+              topic: 'mgmt/status/armed'
+              retain: 1
+
+armed:
+  priority: 10
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      action_interval: 30
+      threshold: 'lambda x: int(x)==1'
+      message_template: 'Alarm armed'
+
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      action_interval: 30
+      threshold: 'lambda x: int(x)==0'
+      message_template: 'Alarm disarmed'
+
+sunset:
+  priority: 100
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      transform: 'lambda x: int(x) - int(time.time())'
+      action_interval: 3600
+      threshold: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+      message_template: 'Sunset in 1h'
+
+sunrise:
+  priority: 100
+  actions:
+    - action:
+        - name: 'send_pushover'
+          failback:
+            - name: 'send_mail'
+        - name: 'log'
+      transform: 'lambda x: int(x) - int(time.time())'
+      action_interval: 3600
+      threshold: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+      message_template: 'Sunrise in 1h'
+

@@ -1,6 +1,7 @@
 import logging
 import sys
 
+import paho.mqtt.client as paho
 import paho.mqtt.publish as publish
 
 from moteino_sensors import utils
@@ -22,8 +23,7 @@ def send_mqtt(data, action_config):
   action_config = {
     "server": "localhost",
     "port": 1883,
-    "topic": "topic",
-    "message": ["message", "message {board_id}"],
+    "message": [{"topic": "topic_name", "message": "message {board_id}", "retain": 0}],
     "enabled": 1
   }
   """
@@ -33,9 +33,7 @@ def send_mqtt(data, action_config):
   LOG.info('Sending message over MQTT')
 
   mqtt_details = {
-    'topic': action_config['topic'],
     'qos': action_config.get('qos', 0),
-    'retain': action_config.get('retain', False),
     'hostname': action_config.get('hostname', 'localhost'),
     'port': action_config.get('port', 1883),
     'auth': action_config.get('auth', None)
@@ -43,17 +41,20 @@ def send_mqtt(data, action_config):
 
   for m in action_config['message']:
     try:
-      m = m.format(**data)
+      topic = m['topic'].format(**data)
+      message = m['message'].format(**data)
+      retain = m.get('retain', False)
     except (KeyError, ValueError) as e:
-      LOG.warning("Fail to format message '%s' with data '%s'", m, data)
+      LOG.warning("Fail to format message with data '%s'", data)
       continue
 
-    publish.single(mqtt_details['topic'],
-            payload=m,
+    publish.single(topic,
+            payload=message,
+            retain=retain,
             qos=mqtt_details['qos'],
-            retain=mqtt_details['retain'],
             hostname=mqtt_details['hostname'],
             port=mqtt_details['port'],
-            auth=mqtt_details['auth'])
+            auth=mqtt_details['auth'],
+            protocol=paho.MQTTv31)
 
   sys.exit(0)
