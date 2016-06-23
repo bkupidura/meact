@@ -161,10 +161,10 @@ def post_graph(graph_type = None):
 
 
 class Api(mqtt.Mqtt):
-  def __init__(self, conf):
+  def __init__(self, mqtt_config):
     super(Api, self).__init__()
     self.name = 'api'
-    self.mqtt_config = conf['mqtt']
+    self.mqtt_config = mqtt_config
     self.start_mqtt()
 
 
@@ -172,21 +172,23 @@ def main():
   parser = utils.create_arg_parser('Moteino gateway API')
   args = parser.parse_args()
 
-  api_config = utils.load_config(args.dir + '/global.config.json')
+  conf = utils.load_config(args.dir + '/global.yaml')
+  conf = conf.get('api', {})
 
   # static_dir in config file should be specified only if
   # static files are located somewhere else than app package
-  if not api_config.get('static_dir'):
-      api_config['static_dir'] = os.path.join(os.path.dirname(__file__), 'static')
+  if not conf.get('static_dir'):
+      conf['static_dir'] = os.path.join(os.path.dirname(__file__), 'static')
 
-  app.config['appconfig'] = api_config
+  app.config['appconfig'] = conf
+  logging_conf = conf.get('logging', {})
 
-  app.config['mqtt'] = Api(app.config['appconfig'])
+  app.config['mqtt'] = Api(conf['mqtt'])
   app.config['mqtt'].loop_start()
 
-  utils.create_logger()
+  utils.create_logger(logging_conf)
 
-  app.config['db'] = database.connect(app.config['appconfig']['db_string'])
+  app.config['db'] = database.connect(conf['db_string'])
 
   app.run(host='0.0.0.0', port=8080, server='tornado')
 

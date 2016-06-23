@@ -79,7 +79,8 @@ def main():
   parser = utils.create_arg_parser('SRL - mgw serial')
   args = parser.parse_args()
 
-  conf = utils.load_config(args.dir + '/global.config.json')
+  conf = utils.load_config(args.dir + '/global.yaml')
+  conf = conf.get('srl', {})
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
@@ -93,7 +94,6 @@ def main():
     serial=ser,
     mqtt_config=conf['mqtt'],
     re_sensor_data=conf['re_sensor_data'])
-
   srl.run()
 
 

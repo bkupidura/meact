@@ -38,13 +38,13 @@ class FeedsStatusAdapter(dict):
     self[feed_name]['last_fail'] = now
 
 class Feeder(mqtt.Mqtt):
-  def __init__(self, conf, feeds_map_file):
+  def __init__(self, mqtt_config, feeds_map_file):
     super(Feeder, self).__init__()
     self.name = 'feeder'
     self.enabled = Event()
     self.enabled.set()
     self.status = {'feeder': 1}
-    self.mqtt_config = conf['mqtt']
+    self.mqtt_config = mqtt_config
     self.feeds_status = FeedsStatusAdapter()
     self.start_mqtt()
     self._validate_feeds(feeds_map_file)
@@ -135,13 +135,14 @@ def main():
   parser = utils.create_arg_parser('Feeder')
   args = parser.parse_args()
 
-  conf = utils.load_config(args.dir + '/global.config.json')
-  feeds_map_file = args.dir + '/feeds.config.json'
+  conf = utils.load_config(args.dir + '/global.yaml')
+  conf = conf.get('feeder', {})
+  feeds_map_file = args.dir + '/feeds.yaml'
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  feeder = Feeder(conf=conf, feeds_map_file=feeds_map_file)
+  feeder = Feeder(mqtt_config=conf['mqtt'], feeds_map_file=feeds_map_file)
   feeder.run()
 
 

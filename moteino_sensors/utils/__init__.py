@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-import json
+from yaml import load as yaml_load
 import logging
 import os
 import pkgutil
@@ -22,8 +22,8 @@ def load_config(config_name):
   if not os.path.isfile(config_name):
     raise KeyError('Config {} is missing'.format(config_name))
 
-  with open(config_name) as json_config:
-    config = json.load(json_config)
+  with open(config_name) as yaml_config:
+    config = yaml_load(yaml_config)
 
   return config
 
@@ -77,15 +77,17 @@ def create_logger(conf=None):
   if conf is None:
     conf = {}
 
-  level = conf.get('level', logging.INFO)
-  log_file = conf.get('file')
+  logging_level = conf.get('level', logging.INFO)
+  logging_file = conf.get('file')
+  logging_formatter = conf.get('formatter', '%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
   logger = logging.getLogger()
-  logger.setLevel(level)
-  formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+  formatter = logging.Formatter(logging_formatter)
 
-  if log_file:
-    handler = logging.FileHandler(log_file)
+  logger.setLevel(logging_level)
+
+  if logging_file:
+    handler = logging.FileHandler(logging_file)
   else:
     handler = logging.StreamHandler(sys.stdout)
 
@@ -95,7 +97,7 @@ def create_logger(conf=None):
 
 def create_arg_parser(description):
   parser = ArgumentParser(description=description)
-  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.config.json')
+  parser.add_argument('--dir', required=True, help='Root directory, should cotains *.yaml')
   return parser
 
 
@@ -149,11 +151,7 @@ def eval_helper(threshold_lambda, arg1=None, arg2=None):
     elif threshold_func_arg_number == 1:
       threshold_result = threshold_func(arg1)
     elif threshold_func_arg_number == 2:
-      try:
-        threshold_result = threshold_func(arg1, arg2)
-      except (IndexError):
-        LOG.info('Not enough values stored to check threshold')
-        threshold_result = False
+      threshold_result = threshold_func(arg1, arg2)
   except Exception as e:
     LOG.error("Exception '%s' in lambda '%s' args '%s' '%s'", e, threshold_lambda, arg1, arg2)
     threshold_result = False

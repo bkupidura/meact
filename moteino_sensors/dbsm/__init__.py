@@ -53,8 +53,9 @@ def main():
   parser.add_argument('--sync-db-desc', required=False, help='Sync boards description', action="store_true")
   args = parser.parse_args()
 
-  conf = utils.load_config(args.dir + '/global.config.json')
-  boards_map = utils.load_config(args.dir + '/boards.config.json')
+  conf = utils.load_config(args.dir + '/global.yaml')
+  conf = conf.get('dbsm', {})
+  boards_map = utils.load_config(args.dir + '/boards.yaml')
 
   db = database.connect(conf['db_string'])
 

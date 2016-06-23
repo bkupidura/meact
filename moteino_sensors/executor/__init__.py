@@ -340,8 +340,9 @@ def main():
   parser = utils.create_arg_parser('Moteino executor')
   args = parser.parse_args()
 
-  conf = utils.load_config(args.dir + '/global.config.json')
-  sensors_map_file = args.dir + '/sensors.config.json'
+  conf = utils.load_config(args.dir + '/global.yaml')
+  conf = conf.get('executor', {})
+  sensors_map_file = args.dir + '/sensors.yaml'
 
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)

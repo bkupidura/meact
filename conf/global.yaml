@@ -1,0 +1,118 @@
+#
+# Defaults
+#
+defaults:
+  logging: &default_logging
+    level: 20
+    formatter: '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+  db_string: &default_db_string 'sqlite:////etc/mgw/mgw.db'
+  mqtt: &default_mqtt
+    server: localhost
+    topic:
+      subscribe:
+        mgmt/status: 'mgmt/status/#'
+      mgmt/status: 'mgmt/status'
+#
+# Executor configuration
+#
+executor:
+  logging:
+    << : *default_logging
+  db_string: *default_db_string
+  mqtt:
+    << : *default_mqtt
+    topic:
+      subscribe:
+        mgmt/status: 'mgmt/status/#'
+        executor/metric: 'executor/metric/+/+'
+        dbsm/metric: 'dbsm/metric/+/+'
+      mgmt/status: 'mgmt/status'
+      executor/metric: 'executor/metric'
+  action_config:
+    send_bulksms:
+      ednpoint: 'https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0'
+      user: 'user'
+      password: 'password'
+      enabled: 0
+    send_mail:
+      sender: 'sender@example.com'
+      recipient: 'recipient@example.com'
+      subject: 'RPI notification'
+      host: 'email-smtp.eu-west-1.amazonaws.com'
+      port: 587
+      user: 'user'
+      password: 'password'
+      enabled: 0
+    send_sms_at:
+      port: '/dev/ttyUSB1'
+      speed: 19200
+      enabled: 0
+    send_instapush:
+      endpoint: 'https://api.instapush.im/v1/post'
+      event: 'notification'
+      enabled: 0
+    send_ifttt_maker:
+      endpoint: 'https://maker.ifttt.com/trigger'
+      auth_key: 'auth_key'
+      enabled: 0
+    send_mqtt:
+      server: 'localhost'
+      enabled: 0
+    send_pushover:
+      endpoint: 'https://api.pushover.net/1/messages.json'
+      token: 'token'
+      user_key: 'user_key'
+      enabled: 0
+#
+# SRL configuration
+#
+srl:
+  logging:
+    << : *default_logging
+  mqtt:
+    << : *default_mqtt
+    topic:
+      subscribe:
+        mgmt/status: 'mgmt/status/#'
+        srl/write: 'srl/write'
+      mgmt/status: 'mgmt/status'
+      dbsm/metric: 'dbsm/metric'
+  serial:
+    device: '/dev/ttyUSB0'
+    speed: 115200
+    timeout: 20
+  re_sensor_data: '\[(?P<board_id>.+)\]\[(?P<sensor_type>.+):(?P<sensor_data>.+)\]'
+#
+# Feeder configuration
+#
+feeder:
+  logging:
+    << : *default_logging
+  mqtt:
+    << : *default_mqtt
+#
+# DBSM configuration
+#
+dbsm:
+  logging:
+    << : *default_logging
+  db_string: *default_db_string
+  mqtt:
+    << : *default_mqtt
+    topic:
+      subscribe:
+        mgmt/status: 'mgmt/status/#'
+        dbsm/metric: 'dbsm/metric/+/+'
+      mgmt/status: 'mgmt/status'
+#
+# API configuration
+#
+api:
+  logging:
+    << : *default_logging
+  db_string: *default_db_string
+  mqtt:
+    << : *default_mqtt
+  allowed_cidrs:
+    - '127.0.0.1/24'
+  user_static_dir: '/etc/mgw/api/static'
