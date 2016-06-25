@@ -23,7 +23,7 @@ def send_mqtt(data, action_config):
   action_config = {
     "server": "localhost",
     "port": 1883,
-    "message": [{"topic": "topic_name", "message": "message {board_id}", "retain": 0}],
+    "message": [{"topic": "topic_name", "payload": "message {board_id}", "retain": 0}],
     "enabled": 1
   }
   """
@@ -34,7 +34,7 @@ def send_mqtt(data, action_config):
 
   mqtt_details = {
     'qos': action_config.get('qos', 0),
-    'hostname': action_config.get('hostname', 'localhost'),
+    'hostname': action_config.get('server', 'localhost'),
     'port': action_config.get('port', 1883),
     'auth': action_config.get('auth', None)
   }
@@ -42,14 +42,14 @@ def send_mqtt(data, action_config):
   for m in action_config['message']:
     try:
       topic = m['topic'].format(**data)
-      message = m['message'].format(**data)
+      payload = m['payload'].format(**data)
       retain = m.get('retain', False)
     except (KeyError, ValueError) as e:
       LOG.warning("Fail to format message with data '%s'", data)
       continue
 
     publish.single(topic,
-            payload=message,
+            payload=payload,
             retain=retain,
             qos=mqtt_details['qos'],
             hostname=mqtt_details['hostname'],

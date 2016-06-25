@@ -162,7 +162,7 @@ geolocation:
       action_config:
         send_mqtt:
           message:
-            - message: '1'
+            - payload: '1'
               topic: 'mgmt/status/armed'
               retain: 1
 
@@ -179,7 +179,7 @@ geolocation:
       action_config:
         send_mqtt:
           message:
-            - message: '0'
+            - payload: '0'
               topic: 'mgmt/status/armed'
               retain: 1
 

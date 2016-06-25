@@ -21,13 +21,13 @@ def sql_query(feed_config, feed_result):
 
   LOG.debug('Getting feed from SQL')
 
-  sql_params = feed_config['params']
+  sql_params = {
+    'db_string': feed_config['params']['db_string'],
+    'db_query': feed_config['params']['db_query']
+  }
 
-  db_string = sql_params['db_string']
-  db_query = sql_params['db_query']
-
-  db = database.connect(db_string)
-  raw_result = db.execute(db_query)
+  db = database.connect(sql_params['db_string'])
+  raw_result = db.execute(sql_params['db_query'])
 
   result = [row.values() for row in raw_result] 
 

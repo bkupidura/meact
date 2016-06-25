@@ -36,10 +36,12 @@ executor:
       enabled: 0
     send_mail:
       sender: 'sender@example.com'
-      recipient: 'recipient@example.com'
+      recipient:
+        - 'recipient@example.com'
       subject: 'RPI notification'
       host: 'email-smtp.eu-west-1.amazonaws.com'
       port: 587
+      tls: 1
       user: 'user'
       password: 'password'
       enabled: 0

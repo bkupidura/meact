@@ -22,27 +22,30 @@ def http_json(feed_config, feed_result):
 
   LOG.debug('Getting feed from HTTP')
 
-  http_params = feed_config['params']
+  http_params = {
+    'url': feed_config['params']['url'],
+    'method': feed_config['params'].get('method'),
+    'params': feed_config['params'].get('params'),
+    'data': feed_config['params'].get('data'),
+    'headers': feed_config['params'].get('headers'),
+    'verify_ssl': feed_config['params'].get('verify_ssl', False),
+    'timeout': feed_config['params'].get('timeout', 2)
+  }
 
-  url = http_params['url']
-  method = http_params.get('method')
-  params = http_params.get('params')
-  data = http_params.get('data')
-  auth_user = http_params.get('auth_user')
-  auth_pass = http_params.get('auth_pass')
-  headers = http_params.get('headers')
-  verify_ssl = http_params.get('verify_ssl', False)
-  timeout = http_params.get('timeout', 2)
 
-  if auth_user and auth_pass:
-    auth = (auth_user, auth_pass)
+  if feed_config['params'].get('auth_user') and feed_config['params'].get('auth_pass'):
+    http_params['auth'] = (feed_config['params']['auth_user'], feed_config['params']['auth_pass'])
   else:
-    auth = None
+    http_params['auth'] = None
   
-  req = utils.http_request(url, method=method,
-          params=params, data=data, auth=auth,
-          headers=headers, verify_ssl=verify_ssl,
-          timeout=timeout)
+  req = utils.http_request(http_params['url'],
+          method=http_params['method'],
+          params=http_params['params'],
+          data=http_params['data'],
+          auth=http_params['auth'],
+          headers=http_params['headers'],
+          verify_ssl=http_params['verify_ssl'],
+          timeout=http_params['timeout'])
 
   if not req:
     LOG.warning("Fail to get feeds from '%s'", url)
