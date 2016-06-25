@@ -7,7 +7,7 @@ TIMEOUT=5
 def log(data, action_config):
   """Log action
 
-  Allow to push message to mgw-gateway log
+  Allow to push message to executor log
   """
   LOG.info("Log action '%s'", data['message'])
   sys.exit(0)

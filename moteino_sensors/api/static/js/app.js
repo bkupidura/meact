@@ -14,7 +14,7 @@ dashboardApp.constant('dashboardConfig', {
     'default': [{'name': 'reboot', 'command': '%(board)s:255', 'mqtt_topic': 'srl/write'}, {'name': 'blink', 'command': '%(board)s:11', 'mqtt_topic': 'srl/write'}]
   },
   status: {
-    'service': ['dbsm', 'srl', 'mgw', 'feeder'],
+    'service': ['dbsm', 'srl', 'executor', 'feeder'],
     'feeder': ['feeder/msd', 'feeder/fencing'],
     'general': ['armed']
   },

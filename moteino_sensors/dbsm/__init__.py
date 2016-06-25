@@ -72,11 +72,11 @@ def main():
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  mgw = Dbsm(
+  dbsm = Dbsm(
     db_string=conf['db_string'],
     mqtt_config=conf['mqtt'])
 
-  mgw.run()
+  dbsm.run()
 
 
 if __name__ == "__main__":

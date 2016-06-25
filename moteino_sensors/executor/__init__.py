@@ -68,13 +68,13 @@ class ActionStatusAdapter(dict):
     self[id_hex][sensor_config_id]['last_action'] = now
 
 
-class Mgw(mqtt.Mqtt):
+class Executor(mqtt.Mqtt):
   def __init__(self, db_string, sensors_map_file, action_config, mqtt_config):
-    super(Mgw, self).__init__()
-    self.name = 'mgw'
+    super(Executor, self).__init__()
+    self.name = 'executor'
     self.enabled = Event()
     self.enabled.set()
-    self.status = {'mgw': 1, 'armed': 1}
+    self.status = {'executor': 1, 'armed': 1}
     self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
     self.action_config = action_config
@@ -121,7 +121,7 @@ class Mgw(mqtt.Mqtt):
     self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
 
   def _on_mgmt_status(self, client, userdata, msg):
-    super(Mgw, self)._on_mgmt_status(client, userdata, msg)
+    super(Executor, self)._on_mgmt_status(client, userdata, msg)
 
     status_topic = self.mqtt_config['topic'].get('mgmt/status')
     metric_topic = self.mqtt_config['topic'].get('executor/metric')
@@ -347,13 +347,13 @@ def main():
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  mgw = Mgw(
+  executor = Executor(
     db_string=conf['db_string'],
     sensors_map_file=sensors_map_file,
     action_config=conf['action_config'],
     mqtt_config=conf['mqtt'])
 
-  mgw.run()
+  executor.run()
 
 
 if __name__ == "__main__":
