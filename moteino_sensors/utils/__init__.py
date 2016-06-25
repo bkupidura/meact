@@ -10,8 +10,6 @@ import time
 from jsonschema import Draft4Validator
 from jsonschema.exceptions import ValidationError
 
-from moteino_sensors import actions
-from moteino_sensors import feeds
 from moteino_sensors.utils import schemas
 
 LOG = logging.getLogger(__name__)
@@ -113,32 +111,18 @@ def http_request(url, method='GET', params=None, data=None, auth=None, headers=N
   return req
 
 
-def load_actions():
-    mapping = {}
+def load_mapping(module):
+  mapping = {}
 
-    prefix = actions.__name__ + '.'
-    for _, action_name, _ in pkgutil.iter_modules(actions.__path__):
-        action_module = __import__(prefix + action_name,
-                                   globals(), locals(), fromlist=[action_name, ])
-        action_func = getattr(action_module, action_name)
-        timeout = getattr(action_module, 'TIMEOUT', 10)
-        mapping[action_name] = {'func': action_func, 'timeout': timeout}
-        # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
-    return mapping
-
-
-def load_feeds():
-    mapping = {}
-
-    prefix = feeds.__name__ + '.'
-    for _, feed_name, _ in pkgutil.iter_modules(feeds.__path__):
-        feed_module = __import__(prefix + feed_name,
-                                   globals(), locals(), fromlist=[feed_name, ])
-        feed_func = getattr(feed_module, feed_name)
-        timeout = getattr(feed_module, 'TIMEOUT', 10)
-        mapping[feed_name] = {'func': feed_func, 'timeout': timeout}
-        # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
-    return mapping
+  prefix = module.__name__ + '.'
+  for _, name, _ in pkgutil.iter_modules(module.__path__):
+    m = __import__(prefix + name,
+            globals(), locals(), fromlist=[name, ])
+    func = getattr(m, name)
+    timeout = getattr(m, 'TIMEOUT', 10)
+    mapping[name] = {'func': func, 'timeout': timeout}
+    # TODO(prmtl): chec with 'inspect.getargspec' if method accepts correct arguments
+  return mapping
 
 
 def eval_helper(threshold_lambda, arg1=None, arg2=None):
@@ -157,6 +141,7 @@ def eval_helper(threshold_lambda, arg1=None, arg2=None):
     threshold_result = False
 
   return threshold_result
+
 
 def prepare_sensor_data(sensor_data):
   validation_result, sensor_data = validate_sensor_data(sensor_data)

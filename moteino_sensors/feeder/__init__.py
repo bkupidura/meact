@@ -7,6 +7,7 @@ import time
 
 from moteino_sensors import mqtt
 from moteino_sensors import utils
+from moteino_sensors.feeder import feeds
 
 class FeedsStatusAdapter(dict):
   def build_defaults(self, feed_name):
@@ -129,7 +130,7 @@ class Feeder(mqtt.Mqtt):
 
 
 LOG = logging.getLogger(__name__)
-FEEDS_MAPPING = utils.load_feeds()
+FEEDS_MAPPING = utils.load_mapping(feeds)
 
 def main():
   parser = utils.create_arg_parser('Feeder')

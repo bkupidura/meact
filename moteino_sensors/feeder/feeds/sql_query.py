@@ -29,11 +29,11 @@ def sql_query(feed_config, feed_result):
   db = database.connect(sql_params['db_string'])
   raw_result = db.execute(sql_params['db_query'])
 
-  result = [row.values() for row in raw_result] 
+  result = [row.values() for row in raw_result]
 
   jq_result = jq(feed_config['expression']).transform(result, multiple_output=True)
   feed_result['sensor_data'] = jq_result
 
   LOG.debug("Got response from SQL query '%s'", result)
-    
+
   sys.exit(0)

@@ -37,7 +37,7 @@ def http_json(feed_config, feed_result):
     http_params['auth'] = (feed_config['params']['auth_user'], feed_config['params']['auth_pass'])
   else:
     http_params['auth'] = None
-  
+
   req = utils.http_request(http_params['url'],
           method=http_params['method'],
           params=http_params['params'],
@@ -61,5 +61,5 @@ def http_json(feed_config, feed_result):
   feed_result['sensor_data'] = jq_result
 
   LOG.debug("Got response from HTTP '%s'", response)
-    
+
   sys.exit(0)

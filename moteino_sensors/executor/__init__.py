@@ -12,6 +12,7 @@ import time
 from moteino_sensors import database
 from moteino_sensors import mqtt
 from moteino_sensors import utils
+from moteino_sensors.executor import actions
 
 class SensorActionAdapter(dict):
   """Adapter for sensor action from SensorConfig
@@ -334,7 +335,7 @@ class Executor(mqtt.Mqtt):
 
 
 LOG = logging.getLogger(__name__)
-ACTIONS_MAPPING = utils.load_actions()
+ACTIONS_MAPPING = utils.load_mapping(actions)
 
 def main():
   parser = utils.create_arg_parser('Moteino executor')
