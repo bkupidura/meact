@@ -5,6 +5,8 @@ import logging
 import sys
 import time
 
+from sqlalchemy.exc import OperationalError
+
 from moteino_sensors import database
 from moteino_sensors import mqtt
 from moteino_sensors import utils
@@ -42,7 +44,10 @@ class Dbsm(mqtt.Mqtt):
 
       LOG.debug("Got new metric '%s'", sensor_data)
 
-      database.insert_metric(self.db, sensor_data)
+      try:
+        database.insert_metric(self.db, sensor_data)
+      except OperationalError as e:
+        LOG.error("Fail to save data '%s'", e)
 
 
 LOG = logging.getLogger(__name__)
