@@ -7,7 +7,8 @@ ping_gw:
             - name: 'send_sms_at'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)==0'
+      threshold:
+        lambda: 'lambda x: int(x)==0'
       fail_count: 2
       fail_interval: 3600
       message_template: 'Problem with gateway connection {board_desc} ({board_id})'
@@ -25,7 +26,8 @@ ping_internet:
             - name: 'send_sms_at'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)==0'
+      threshold:
+        lambda: 'lambda x: int(x)==0'
       fail_count: 2
       fail_interval: 3600
       message_template: 'Problem with internet connection {board_desc} ({board_id})'
@@ -43,7 +45,8 @@ power:
             - name: 'send_sms_at'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)==0'
+      threshold:
+        lambda: 'lambda x: int(x)==0'
       message_template: 'Problem with power supply {board_desc} ({board_id})'
       action_config:
         send_sms_at:
@@ -59,7 +62,8 @@ voltage:
             - name: 'send_mail'
         - name: 'log'
       action_interval: 7200
-      threshold: 'lambda x: float(x)<3.15'
+      threshold:
+        lambda: 'lambda x: float(x)<3.15'
       fail_count: 2
       fail_interval: 300
       message_template: 'Board {board_desc} ({board_id}) reports low voltage {sensor_data}V'
@@ -71,7 +75,8 @@ failedreport:
         - name: 'send_mail'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)>0'
+      threshold:
+        lambda: 'lambda x: int(x)>0'
       message_template: 'Board {board_desc} ({board_id}) failed reports {sensor_data}'
 
 rssi:
@@ -81,7 +86,8 @@ rssi:
         - name: 'send_mail'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)<-95'
+      threshold:
+        lambda: 'lambda x: int(x)<-95'
       fail_count: 3
       fail_interval: 1200
       message_template: 'Board {board_desc} ({board_id}) low RSSI {sensor_data}'
@@ -98,9 +104,11 @@ motion:
         - name: 'log'
       check_status:
         - name: 'armed'
-          threshold: 'lambda x: int(x)==1'
+          threshold:
+            lambda: 'lambda x: int(x)==1'
       action_interval: 360
-      threshold: 'lambda x: int(x)==1'
+      threshold:
+        lambda: 'lambda x: int(x)==1'
       message_template: 'Motion detected on board {board_desc} ({board_id})'
       action_config:
         send_sms_at:
@@ -119,7 +127,8 @@ uptime:
             - name: 'send_mail'
         - name: 'log'
       action_interval: 3600
-      threshold: 'lambda x: int(x)<25'
+      threshold:
+        lambda: 'lambda x: int(x)<25'
       message_template: 'Board {board_desc} ({board_id}) was rebooted'
 
 msd:
@@ -136,8 +145,9 @@ msd:
         - '10'
         - '11'
         - '12'
-      threshold: 'lambda x: int(x)>300'
-      transform: 'lambda x: int(time.time()) - int(x)'
+      threshold:
+        lambda: 'lambda x: int(x)>300'
+        transform: 'lambda x: int(time.time()) - int(x)'
       message_template: 'Board {board_desc} ({board_id}) is missing for {sensor_data} seconds'
 
 geolocation:
@@ -146,19 +156,22 @@ geolocation:
     - action:
         - name: 'send_mqtt'
       action_interval: 30
-      threshold: "lambda x: str(x) == 'exit'"
+      threshold:
+        lambda: "lambda x: str(x) == 'exit'"
       check_metric:
         - sensor_type: 'geolocation'
           board_ids:
             - 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA'
             - 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB'
-          threshold: "lambda x: len([metric for metric in x if metric.sensor_data == 'exit']) == 2"
+          threshold:
+            lambda: "lambda x: len([metric for metric in x if metric.sensor_data == 'exit']) == 2"
           value_count:
             type: "LastMetric"
             count: 1
       check_status:
         - name: 'armed'
-          threshold: 'lambda x: int(x) == 0'
+          threshold:
+            lambda: 'lambda x: int(x) == 0'
       action_config:
         send_mqtt:
           message:
@@ -172,10 +185,12 @@ geolocation:
       board_ids:
         - 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA'
         - 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB'
-      threshold: "lambda x: str(x) == 'enter'"
+      threshold:
+        lambda: "lambda x: str(x) == 'enter'"
       check_status:
         - name: "armed"
-          threshold: "lambda x: int(x) == 1"
+          threshold:
+            lambda: "lambda x: int(x) == 1"
       action_config:
         send_mqtt:
           message:
@@ -192,7 +207,8 @@ armed:
             - name: 'send_mail'
         - name: 'log'
       action_interval: 30
-      threshold: 'lambda x: int(x)==1'
+      threshold:
+        lambda: 'lambda x: int(x)==1'
       message_template: 'Alarm armed'
 
     - action:
@@ -201,7 +217,8 @@ armed:
             - name: 'send_mail'
         - name: 'log'
       action_interval: 30
-      threshold: 'lambda x: int(x)==0'
+      threshold:
+        lambda: 'lambda x: int(x)==0'
       message_template: 'Alarm disarmed'
 
 sunset:
@@ -212,9 +229,10 @@ sunset:
           failback:
             - name: 'send_mail'
         - name: 'log'
-      transform: 'lambda x: int(x) - int(time.time())'
       action_interval: 3600
-      threshold: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+      threshold:
+        lambda: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+        transform: 'lambda x: int(x) - int(time.time())'
       message_template: 'Sunset in 1h'
 
 sunrise:
@@ -225,8 +243,9 @@ sunrise:
           failback:
             - name: 'send_mail'
         - name: 'log'
-      transform: 'lambda x: int(x) - int(time.time())'
       action_interval: 3600
-      threshold: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+      threshold:
+        lambda: 'lambda x: x if x is False else int(x) >= 0 and int(x) <= 3600'
+        transform: 'lambda x: int(x) - int(time.time())'
       message_template: 'Sunrise in 1h'
 

@@ -209,19 +209,18 @@ class Executor(mqtt.Mqtt):
 
     return result
 
-  def _get_value_count(self, value_count=None, board_ids=None, sensor_type=None):
+  def _get_value_count(self, value_count, board_ids=None, sensor_type=None):
     metrics = []
-    if value_count:
-      if value_count['type'] == 'Metric':
-        metrics = database.get_metrics(self.db,
-                board_ids=board_ids,
-                sensor_type=sensor_type,
-                last_available=value_count['count'])
+    if value_count['type'] == 'Metric':
+      metrics = database.get_metrics(self.db,
+              board_ids=board_ids,
+              sensor_type=sensor_type,
+              last_available=value_count['count'])
 
-      elif value_count['type'] == 'LastMetric':
-        metrics = database.get_last_metrics(self.db,
-                board_ids=board_ids,
-                sensor_type=sensor_type)
+    elif value_count['type'] == 'LastMetric':
+      metrics = database.get_last_metrics(self.db,
+              board_ids=board_ids,
+              sensor_type=sensor_type)
 
     return metrics
 
@@ -245,11 +244,14 @@ class Executor(mqtt.Mqtt):
       if not sensor_action.action_for_board(sensor_data['board_id']):
         continue
 
-      #Transform sensor_data
-      transform_threshold = sensor_action.get('transform')
-      if transform_threshold:
-        sensor_data['sensor_data'] = utils.eval_helper(transform_threshold,
-                sensor_data['sensor_data'])
+      #Check threshold function
+      transform_result, threshold_result = utils.treshold_helper(sensor_action['threshold'],
+              sensor_data['sensor_data'])
+
+      sensor_data['sensor_data'] = transform_result
+
+      if not threshold_result:
+        continue
 
       #Format message
       try:
@@ -258,23 +260,10 @@ class Executor(mqtt.Mqtt):
         LOG.error("Fail to format message '%s' with data '%s'", sensor_action['message_template'], sensor_data)
         continue
 
-      #Get historical metrics if needed
-      metrics = self._get_value_count(sensor_action['value_count'],
-              sensor_data['board_id'],
-              sensor_data['sensor_type'])
-
-      #Check threshold function
-      threshold_result = utils.eval_helper(sensor_action['threshold'],
-              sensor_data['sensor_data'],
-              metrics)
-
-      if not threshold_result:
-        continue
-
       #Check status threshold function
       check_status_result = True
       for check_status in sensor_action['check_status']:
-        check_status_result = utils.eval_helper(check_status['threshold'],
+        _, check_status_result = utils.treshold_helper(check_status['threshold'],
                 self.status.get(check_status['name']))
         if not check_status_result:
           break
@@ -289,7 +278,7 @@ class Executor(mqtt.Mqtt):
                 check_metric['board_ids'],
                 check_metric['sensor_type'])
 
-        check_metric_result = utils.eval_helper(check_metric['threshold'],
+        _, check_metric_result = utils.treshold_helper(check_metric['threshold'],
                 metrics)
 
         if not check_metric_result:

@@ -17,22 +17,21 @@ SCHEMA_DEFINITIONS = {
     "uniqueItems": True,
     "items": {"$ref": "#/definitions/boardID"}
   },
+  "threshold": {
+    "type": "object",
+    "properties": {
+      "lambda": {"$ref": "#/definitions/notEmptyString"},
+      "transform": {"$ref": "#/definitions/notEmptyString"}
+    },
+    "required": ["lambda"]
+  },
   "valueCount": {
-    "oneOf": [
-      {
-        "type": "object",
-        "properties": {
-          "type": {"$ref": "#/definitions/notEmptyString"},
-          "count": {"$ref": "#/definitions/positiveInteger"}
-        },
-        "required": ["type", "count"]
-      },
-      {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": False
-      }
-    ]
+    "type": "object",
+    "properties": {
+      "type": {"$ref": "#/definitions/notEmptyString"},
+      "count": {"$ref": "#/definitions/positiveInteger"}
+    },
+    "required": ["type", "count"]
   },
   "action": {
     "type": "array",
@@ -58,10 +57,8 @@ SCHEMA_DEFINITIONS = {
         "fail_count": {"$ref": "#/definitions/positiveInteger"},
         "fail_interval": {"$ref": "#/definitions/positiveInteger"},
         "message_template": {"$ref": "#/definitions/notEmptyString"},
-        "threshold": {"$ref": "#/definitions/notEmptyString"},
-        "value_count": {"$ref": "#/definitions/valueCount"},
+        "threshold": {"$ref": "#/definitions/threshold"},
         "board_ids": {"$ref": "#/definitions/boardIDs"},
-        "transform": {"type": "string"},
         "check_status": {
           "type": "array",
           "uniqueItems": True,
@@ -69,7 +66,7 @@ SCHEMA_DEFINITIONS = {
             "type": "object",
             "properties": {
               "name": {"$ref": "#/definitions/notEmptyString"},
-              "threshold": {"$ref": "#/definitions/notEmptyString"}
+              "threshold": {"$ref": "#/definitions/threshold"}
             },
             "required": ["name", "threshold"]
           }
@@ -81,7 +78,7 @@ SCHEMA_DEFINITIONS = {
             "type": "object",
             "properties": {
               "sensor_type": {"$ref": "#/definitions/notEmptyString"},
-              "threshold": {"$ref": "#/definitions/notEmptyString"},
+              "threshold": {"$ref": "#/definitions/threshold"},
               "board_ids": {"$ref": "#/definitions/boardIDs"},
               "value_count": {"$ref": "#/definitions/valueCount"}
             },
@@ -95,8 +92,8 @@ SCHEMA_DEFINITIONS = {
         "action": {"$ref": "#/definitions/action"}
       },
       "required": ["action", "action_interval", "fail_count", "fail_interval",
-          "message_template", "threshold", "transform", "value_count",
-          "board_ids", "check_status", "check_metric", "action_config"]
+          "message_template", "threshold", "board_ids", "check_status",
+          "check_metric", "action_config"]
     }
   }
 }

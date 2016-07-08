@@ -49,12 +49,10 @@ def validate_sensor_config(data):
       action.setdefault('fail_count', 0)
       action.setdefault('fail_interval', 600)
       action.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
-      action.setdefault('threshold', 'lambda: True')
-      action.setdefault('transform', '')
+      action.setdefault('threshold', {'lambda': 'lambda: True'})
       action.setdefault('board_ids', [])
       action.setdefault('check_metric', [])
       action.setdefault('check_status', [])
-      action.setdefault('value_count', {})
       action.setdefault('action_config', {})
   except (AttributeError, TypeError):
     pass
@@ -125,7 +123,21 @@ def load_mapping(module):
   return mapping
 
 
-def eval_helper(threshold_lambda, arg1=None, arg2=None):
+def treshold_helper(threshold, arg1=None):
+  transform = threshold.get('transform')
+
+  if transform:
+    transform_result = eval_helper(transform, arg1)
+  else:
+    transform_result = arg1
+
+  threshold_result = eval_helper(threshold['lambda'], transform_result)
+
+  return transform_result, threshold_result
+
+
+
+def eval_helper(threshold_lambda, arg1=None):
   threshold_func = eval(threshold_lambda)
   threshold_func_arg_number = threshold_func.func_code.co_argcount
 
@@ -134,8 +146,8 @@ def eval_helper(threshold_lambda, arg1=None, arg2=None):
       threshold_result = threshold_func()
     elif threshold_func_arg_number == 1:
       threshold_result = threshold_func(arg1)
-    elif threshold_func_arg_number == 2:
-      threshold_result = threshold_func(arg1, arg2)
+    else:
+      LOG.warning('Too much arguments passed to threshold')
   except Exception as e:
     LOG.error("Exception '%s' in lambda '%s' args '%s' '%s'", e, threshold_lambda, arg1, arg2)
     threshold_result = False

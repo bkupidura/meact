@@ -13,13 +13,11 @@ default_sensor_config = {
   'actions': [
     {
     'check_status': [
-        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
+        {'name': 'armed', 'threshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     'check_metric': [],
     'action_interval': 0,
-    'value_count': {},
-    'threshold': 'lambda x: True',
-    'transform': '',
+    'threshold': {'lambda': 'lambda x: True'},
     'fail_count': 0,
     'fail_interval': 0,
     'message_template': 'Template message for {board_id}',
@@ -35,14 +33,14 @@ board_id = '1'
 check_status_test_data = (
   (
     [
-        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
+        {'name': 'armed', 'threshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     True
   ),
   (
     [
-        {'name': 'armed', 'threshold': 'lambda x: int(x)==1'},
-        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+        {'name': 'armed', 'threshold': {'lambda': 'lambda x: int(x)==1'}},
+        {'name': 'fence', 'threshold': {'lambda': 'lambda x: int(x)==0'}},
     ],
     True
   ),
@@ -53,14 +51,14 @@ check_status_test_data = (
   (
     [
         {'name': 'armed'},
-        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+        {'name': 'fence', 'threshold': {'lambda': 'lambda x: int(x)==0'}},
     ],
     False
   ),
   (
     [
         {'threshold': 'lambda x: int(x)==1'},
-        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+        {'name': 'fence', 'threshold': {'lambda': 'lambda x: int(x)==0'}},
     ],
     False
   ),
@@ -72,7 +70,7 @@ check_status_test_data = (
   ),
   (
     [
-        {'name': 10, 'treshold': 'lambda x: int(x)==1'},
+        {'name': 10, 'treshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     False
   ),
@@ -120,13 +118,13 @@ def test_should_check_status(check_status, expected):
 check_metric_test_data = (
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': {'type': 'Metric', 'count': 10}, 'threshold': 'lambda x: int(x)==1'},
+        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     True
   ),
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': {'type': 'LastMetric', 'count': 1}, 'threshold': 'lambda x: int(x)==1'}
+        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': {'type': 'LastMetric', 'count': 1}, 'threshold': {'lambda': 'lambda x: int(x)==1'}}
     ],
     True
   ),
@@ -136,7 +134,7 @@ check_metric_test_data = (
   ),
   (
     [
-        {'board_ids': [], 'value_count': 1, 'threshold': 'lambda x: int(x)==1'}
+        {'board_ids': [], 'value_count': 1, 'threshold': {'lambda': 'lambda x: int(x)==1'}}
     ],
     False
   ),
@@ -154,14 +152,14 @@ check_metric_test_data = (
   ),
   (
     [
-        {'name': 10, 'threshold': 'lambda x: int(x)==1'},
+        {'name': 10, 'threshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     False
   ),
   (
     [
         {'threshold': 'lambda x: int(x)==1'},
-        {'name': 'fence', 'threshold': 'lambda x: int(x)==0'},
+        {'name': 'fence', 'threshold': {'lambda': 'lambda x: int(x)==0'}},
     ],
     False
   ),
@@ -173,7 +171,7 @@ check_metric_test_data = (
   ),
   (
     [
-        {'name': 10, 'threshold': 'lambda x: int(x)==1'},
+        {'name': 10, 'threshold': {'lambda': 'lambda x: int(x)==1'}},
     ],
     False
   ),
@@ -461,54 +459,33 @@ def test_priority(priority, expected):
 
   assert ada == expected
 
-value_count_test_data = (
+threshold_test_data = (
   (
-    {'type': 'Metric', 'count': 10},
+    {'lambda': 'test'},
     True
   ),
   (
-    {'type': 'LastMetric', 'count': 1},
+    {'lambda': 'test', 'transform': 'test'},
     True
   ),
   (
-    {'type': 'LastMetric', 'count': 0},
-    True
+    {'lambda': 10},
+    False
+  ),
+  (
+    {'transform': 'test'},
+    False
   ),
   (
     {},
-    True
-  ),
-  (
-    {'type': 10, 'count': 10},
     False
   ),
-  (
-    {'type': 'LastMetric'},
-    False
-  ),
-  (
-    {'count': 10},
-    False
-  ),
-  (
-    {'test': 'test'},
-    False
-  ),
-  (
-    10,
-    False
-  ),
-  (
-    [10],
-    False
-  )
 )
 
-
-@pytest.mark.parametrize('value_count, expected', value_count_test_data)
-def test_value_count(value_count, expected):
+@pytest.mark.parametrize('threshold, expected', threshold_test_data)
+def test_threshold(threshold, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['actions'][0]['value_count'] = value_count
+  sensor_config['actions'][0]['threshold'] = threshold
 
   ada, data = utils.validate_sensor_config(sensor_config)
 
@@ -556,15 +533,6 @@ not_empty_string_test_data = (
     False
   ),
 )
-
-@pytest.mark.parametrize('threshold, expected', not_empty_string_test_data)
-def test_threshold(threshold, expected):
-  sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['actions'][0]['threshold'] = threshold
-
-  ada, data = utils.validate_sensor_config(sensor_config)
-
-  assert ada == expected
 
 @pytest.mark.parametrize('message_template, expected', not_empty_string_test_data)
 def test_message_template(message_template, expected):
@@ -697,9 +665,9 @@ default_test_data = (
           "action_interval": 0,
           "check_status": [],
           "check_metric": [],
-          "value_count": {},
-          "threshold": "lambda: True",
-          "transform": "",
+          "threshold": {
+            "lambda": "lambda: True"
+          },
           "fail_count": 0,
           "fail_interval": 600,
           "message_template": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}",
