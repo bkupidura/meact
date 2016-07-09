@@ -46,8 +46,6 @@ def validate_sensor_config(data):
     data.setdefault('priority', 500)
     for action in data.get('actions', {}):
       action.setdefault('action_interval', 0)
-      action.setdefault('fail_count', 0)
-      action.setdefault('fail_interval', 600)
       action.setdefault('message_template', '{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}')
       action.setdefault('threshold', {'lambda': 'lambda: True'})
       action.setdefault('board_ids', [])
@@ -136,7 +134,6 @@ def treshold_helper(threshold, arg1=None):
   return transform_result, threshold_result
 
 
-
 def eval_helper(threshold_lambda, arg1=None):
   threshold_func = eval(threshold_lambda)
   threshold_func_arg_number = threshold_func.func_code.co_argcount
@@ -176,3 +173,10 @@ def prepare_sensor_data_mqtt(mqtt_msg):
     return None
 
   return prepare_sensor_data(sensor_data)
+
+
+def time_offset(offset=None):
+  now = int(time.time())
+  if not offset is None:
+    return now + offset
+  return None

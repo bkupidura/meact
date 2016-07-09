@@ -18,8 +18,6 @@ default_sensor_config = {
     'check_metric': [],
     'action_interval': 0,
     'threshold': {'lambda': 'lambda x: True'},
-    'fail_count': 0,
-    'fail_interval': 0,
     'message_template': 'Template message for {board_id}',
     'action': [{'name': 'action'}],
     'action_config': {'action_name': {'test': 10}},
@@ -118,19 +116,62 @@ def test_should_check_status(check_status, expected):
 check_metric_test_data = (
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': ["10"], 'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'}},
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'}}
     ],
     True
   ),
   (
     [
-        {'sensor_type': 'voltage', 'board_ids': [], 'value_count': {'type': 'LastMetric', 'count': 1}, 'threshold': {'lambda': 'lambda x: int(x)==1'}}
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage'}
+    ],
+    True
+  ),
+  (
+    [
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage', 'board_ids': ['10']}
+    ],
+    True
+  ),
+  (
+    [
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage', 'board_ids': ['10'], 'start_offset': -130}
+    ],
+    True
+  ),
+  (
+    [
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage', 'board_ids': ['10'], 'start_offset': -130, 'end_offset': 200}
     ],
     True
   ),
   (
     [],
     True
+  ),
+  (
+    [
+      {'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage', 'board_ids': ['10'], 'start_offset': -130, 'end_offset': 200}
+    ],
+    False
+  ),
+  (
+    [
+      {'value_count': {'type': 'Metric', 'count': 10},
+       'sensor_type': 'voltage', 'board_ids': ['10'], 'start_offset': -130, 'end_offset': 200}
+    ],
+    False
+  ),
+  (
+    [
+      {'value_count': {'type': 'Metric', 'count': 10}, 'threshold': {'lambda': 'lambda x: int(x)==1'},
+       'sensor_type': 'voltage', 'board_ids': ['10'], 'start_offset': -130, 'end_offset': 'test'}
+    ],
+    False
   ),
   (
     [
@@ -432,24 +473,6 @@ def test_action_interval(action_interval, expected):
 
   assert ada == expected
 
-@pytest.mark.parametrize('fail_count, expected', integer_bigger_than_0_test_data)
-def test_fail_count(fail_count, expected):
-  sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['actions'][0]['fail_count'] = fail_count
-
-  ada, data = utils.validate_sensor_config(sensor_config)
-
-  assert ada == expected
-
-@pytest.mark.parametrize('fail_interval, expected', integer_bigger_than_0_test_data)
-def test_fail_interval(fail_interval, expected):
-  sensor_config = copy.deepcopy(default_sensor_config)
-  sensor_config['actions'][0]['fail_interval'] = fail_interval
-
-  ada, data = utils.validate_sensor_config(sensor_config)
-
-  assert ada == expected
-
 @pytest.mark.parametrize('priority, expected', integer_bigger_than_0_test_data)
 def test_priority(priority, expected):
   sensor_config = copy.deepcopy(default_sensor_config)
@@ -668,8 +691,6 @@ default_test_data = (
           "threshold": {
             "lambda": "lambda: True"
           },
-          "fail_count": 0,
-          "fail_interval": 600,
           "message_template": "{sensor_type} on board {board_desc} ({board_id}) reports value {sensor_data}",
           "action_config": {},
           "board_ids": [],

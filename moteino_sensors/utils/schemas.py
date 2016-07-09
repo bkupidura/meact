@@ -54,8 +54,6 @@ SCHEMA_DEFINITIONS = {
       "type": "object",
       "properties": {
         "action_interval": {"$ref": "#/definitions/positiveInteger"},
-        "fail_count": {"$ref": "#/definitions/positiveInteger"},
-        "fail_interval": {"$ref": "#/definitions/positiveInteger"},
         "message_template": {"$ref": "#/definitions/notEmptyString"},
         "threshold": {"$ref": "#/definitions/threshold"},
         "board_ids": {"$ref": "#/definitions/boardIDs"},
@@ -79,10 +77,21 @@ SCHEMA_DEFINITIONS = {
             "properties": {
               "sensor_type": {"$ref": "#/definitions/notEmptyString"},
               "threshold": {"$ref": "#/definitions/threshold"},
-              "board_ids": {"$ref": "#/definitions/boardIDs"},
-              "value_count": {"$ref": "#/definitions/valueCount"}
+              "board_ids": {
+                "type": "array",
+                "uniqueItems": True,
+                "items": {
+                  "oneOf": [
+                    {"enum": ["{board_id}"]},
+                    {"$ref": "#/definitions/boardID"}
+                  ]
+                }
+              },
+              "value_count": {"$ref": "#/definitions/valueCount"},
+              "start_offset": {"type": "integer"},
+              "end_offset": {"type": "integer"},
             },
-            "required": ["sensor_type", "threshold", "board_ids", "value_count"]
+            "required": ["threshold", "value_count"]
           }
         },
         "action_config": {
@@ -91,9 +100,8 @@ SCHEMA_DEFINITIONS = {
         },
         "action": {"$ref": "#/definitions/action"}
       },
-      "required": ["action", "action_interval", "fail_count", "fail_interval",
-          "message_template", "threshold", "board_ids", "check_status",
-          "check_metric", "action_config"]
+      "required": ["action", "action_interval", "message_template", "threshold",
+          "board_ids", "check_status", "check_metric", "action_config"]
     }
   }
 }

@@ -9,6 +9,8 @@ import random
 import signal
 import time
 
+from sqlalchemy.exc import OperationalError
+
 from moteino_sensors import database
 from moteino_sensors import mqtt
 from moteino_sensors import utils
@@ -30,45 +32,6 @@ class SensorActionAdapter(dict):
     return False
 
 
-class ActionStatusAdapter(dict):
-  """Adapter for action status
-
-  Provider helpers and functions that allows
-  to easily work with action status
-  """
-  def build_defaults(self, id_hex, sensor_config_id, board_id, sensor_type):
-    self.setdefault(id_hex, {'board_id': board_id,
-      'sensor_type': sensor_type
-    })
-    self[id_hex].setdefault(sensor_config_id, {'last_action': 0,
-      'last_fail': []
-    })
-
-  def clean_failed(self, id_hex, sensor_config_id, fail_interval):
-    now = int(time.time())
-    self[id_hex][sensor_config_id]['last_fail'] = \
-      [i for i in self[id_hex][sensor_config_id]['last_fail'] if now - i < fail_interval]
-
-  def check_failed_count(self, id_hex, sensor_config_id, fail_count):
-    now = int(time.time())
-    failed = self[id_hex][sensor_config_id]['last_fail']
-    if len(failed) <= fail_count - 1:
-      self[id_hex][sensor_config_id]['last_fail'].append(now)
-      return False
-    return True
-
-  def check_last_action(self, id_hex, sensor_config_id, action_interval):
-    now = int(time.time())
-    last_action = self[id_hex][sensor_config_id]['last_action']
-    if now - last_action <= action_interval:
-      return False
-    return True
-
-  def update_last_action(self, id_hex, sensor_config_id):
-    now = int(time.time())
-    self[id_hex][sensor_config_id]['last_action'] = now
-
-
 class Executor(mqtt.Mqtt):
   def __init__(self, db_string, sensors_map_file, action_config, mqtt_config):
     super(Executor, self).__init__()
@@ -76,7 +39,6 @@ class Executor(mqtt.Mqtt):
     self.enabled = Event()
     self.enabled.set()
     self.status = {'executor': 1, 'armed': 1}
-    self.action_status = ActionStatusAdapter()
     self.db = database.connect(db_string)
     self.action_config = action_config
     self.mqtt_config = mqtt_config
@@ -98,7 +60,6 @@ class Executor(mqtt.Mqtt):
       self._get_boards(self.db)
       self._validate_sensors_map(self.sensors_map_file)
     elif signum == signal.SIGUSR1:
-      LOG.info("Action status: %s", self.action_status)
       LOG.info("Action config: %s", self.action_config)
       LOG.info("Sensors map: %s", self.sensors_map)
       LOG.info("Boards map: %s", self.boards_map)
@@ -209,18 +170,22 @@ class Executor(mqtt.Mqtt):
 
     return result
 
-  def _get_value_count(self, value_count, board_ids=None, sensor_type=None):
-    metrics = []
-    if value_count['type'] == 'Metric':
-      metrics = database.get_metrics(self.db,
-              board_ids=board_ids,
-              sensor_type=sensor_type,
-              last_available=value_count['count'])
+  def _get_value_count(self, value_count, board_ids=None, sensor_type=None, start_offset=None, end_offset=None):
+    db_params = {
+      'db': self.db,
+      'board_ids': board_ids,
+      'sensor_type': sensor_type,
+      'start': utils.time_offset(start_offset),
+      'end': utils.time_offset(end_offset)
+    }
 
+    if value_count['type'] == 'Metric':
+      db_params['last_available'] = value_count['count']
+      metrics = database.get_metrics(**db_params)
     elif value_count['type'] == 'LastMetric':
-      metrics = database.get_last_metrics(self.db,
-              board_ids=board_ids,
-              sensor_type=sensor_type)
+      metrics = database.get_last_metrics(**db_params)
+    else:
+      metrics = []
 
     return metrics
 
@@ -229,26 +194,13 @@ class Executor(mqtt.Mqtt):
     LOG.debug("Action helper '%s' '%s'", sensor_data, sensor_config['actions'])
     for sensor_action in sensor_config['actions']:
 
-      action_status_id = sensor_data['board_id'] + sensor_data['sensor_type']
-      action_status_id_hex = hashlib.md5(action_status_id).hexdigest()
-
-      self.action_status.build_defaults(action_status_id_hex,
-              sensor_action['id'],
-              sensor_data['board_id'],
-              sensor_data['sensor_type'])
-      self.action_status.clean_failed(action_status_id_hex,
-              sensor_action['id'],
-              sensor_action['fail_interval'])
-
       #Check if config is for given board
       if not sensor_action.action_for_board(sensor_data['board_id']):
         continue
 
       #Check threshold function
-      transform_result, threshold_result = utils.treshold_helper(sensor_action['threshold'],
+      sensor_data['sensor_data'], threshold_result = utils.treshold_helper(sensor_action['threshold'],
               sensor_data['sensor_data'])
-
-      sensor_data['sensor_data'] = transform_result
 
       if not threshold_result:
         continue
@@ -274,10 +226,17 @@ class Executor(mqtt.Mqtt):
       #Check metrics threshold function
       check_metric_result = True
       for check_metric in sensor_action['check_metric']:
-        metrics = self._get_value_count(check_metric['value_count'],
-                check_metric['board_ids'],
-                check_metric['sensor_type'])
+        board_ids = check_metric.get('board_ids')
 
+        if board_ids:
+          board_ids = map(lambda x: x.format(**sensor_data), board_ids)
+
+        metrics = self._get_value_count(check_metric['value_count'],
+                board_ids,
+                check_metric.get('sensor_type'),
+                check_metric.get('start_offset'),
+                check_metric.get('end_offset')
+                )
         _, check_metric_result = utils.treshold_helper(check_metric['threshold'],
                 metrics)
 
@@ -287,25 +246,25 @@ class Executor(mqtt.Mqtt):
       if not check_metric_result:
         continue
 
-      #Check failed count
-      if not self.action_status.check_failed_count(action_status_id_hex,
-              sensor_action['id'],
-              sensor_action['fail_count']):
-        continue
-
       #Check last action time
-      if not self.action_status.check_last_action(action_status_id_hex,
-              sensor_action['id'],
-              sensor_action['action_interval']):
-        continue
+      last_actions = database.get_action(self.db, sensor_data, sensor_action['id'], 1)
+      if not last_actions:
+        last_action = 0
+      else:
+        last_action = last_actions[0].last_update
 
+      if not utils.time_offset(-last_action) > sensor_action['action_interval']:
+        continue
 
       LOG.info("Action execute for data '%s'", sensor_data)
       if self._action_execute(sensor_data,
               sensor_action['action'],
               action_config,
               sensor_action['action_config']):
-        self.action_status.update_last_action(action_status_id_hex, sensor_action['id'])
+        try:
+          database.insert_action(self.db, sensor_data, sensor_action['id'])
+        except OperationalError as e:
+          LOG.error("Fail to save action '%s'", e)
 
   def run(self):
     LOG.info('Starting')

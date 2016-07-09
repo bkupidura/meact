@@ -9,9 +9,17 @@ ping_gw:
       action_interval: 3600
       threshold:
         lambda: 'lambda x: int(x)==0'
-      fail_count: 2
-      fail_interval: 3600
       message_template: 'Problem with gateway connection {board_desc} ({board_id})'
+      check_metric:
+        - sensor_type: 'ping_gw'
+          board_ids:
+            - '{board_id}'
+          threshold:
+            lambda: "lambda x: len(x) == 2"
+          start_offset: -3600
+          value_count:
+            type: "Metric"
+            count: 2
       action_config:
         send_sms_at:
           recipient:
@@ -28,9 +36,17 @@ ping_internet:
       action_interval: 3600
       threshold:
         lambda: 'lambda x: int(x)==0'
-      fail_count: 2
-      fail_interval: 3600
       message_template: 'Problem with internet connection {board_desc} ({board_id})'
+      check_metric:
+        - sensor_type: 'ping_internet'
+          board_ids:
+            - '{board_id}'
+          threshold:
+            lambda: "lambda x: len(x) == 2"
+          start_offset: -3600
+          value_count:
+            type: "Metric"
+            count: 2
       action_config:
         send_sms_at:
           recipient:
@@ -64,9 +80,17 @@ voltage:
       action_interval: 7200
       threshold:
         lambda: 'lambda x: float(x)<3.15'
-      fail_count: 2
-      fail_interval: 300
       message_template: 'Board {board_desc} ({board_id}) reports low voltage {sensor_data}V'
+      check_metric:
+        - sensor_type: 'voltage'
+          board_ids:
+            - '{board_id}'
+          threshold:
+            lambda: "lambda x: len(x) == 2"
+          start_offset: -300
+          value_count:
+            type: "Metric"
+            count: 2
 
 failedreport:
   priority: 50
@@ -88,9 +112,17 @@ rssi:
       action_interval: 3600
       threshold:
         lambda: 'lambda x: int(x)<-95'
-      fail_count: 3
-      fail_interval: 1200
       message_template: 'Board {board_desc} ({board_id}) low RSSI {sensor_data}'
+      check_metric:
+        - sensor_type: 'rssi'
+          board_ids:
+            - '{board_id}'
+          threshold:
+            lambda: "lambda x: len(x) == 3"
+          start_offset: -1200
+          value_count:
+            type: "Metric"
+            count: 3
 
 motion:
   priority: 0

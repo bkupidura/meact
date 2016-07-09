@@ -56,6 +56,25 @@ class Board(Base):
             self.board_desc)
 
 
+class Action(Base):
+  __tablename__ = 'actions'
+
+  id = Column(Integer, primary_key=True)
+  board_id = Column(Text, ForeignKey("boards.board_id"), nullable=False)
+  sensor_type = Column(Text, nullable=False)
+  sensor_action_id = Column(Text, nullable=False)
+  last_update = Column(Integer, nullable=False)
+
+  __table_args__ = (Index('idx_actions', 'board_id', 'sensor_type', 'sensor_action_id', 'last_update'), )
+
+  def __repr__(self):
+    return "<Action(board_id='%s', sensor_type='%s', sensor_action_id='%s', last_update='%s')>" % (
+            self.board_id,
+            self.sensor_type,
+            self.sensor_action_id,
+            self.last_update)
+
+
 def connect(connect_string):
   return create_engine(connect_string, connect_args={'check_same_thread': False})
 
@@ -176,6 +195,33 @@ def delete_metrics(db, record_ids=None):
     s = create_session(db)
     query = s.query(Metric).filter(Metric.id.in_(record_ids)).delete('fetch')
     commit(s)
+
+
+def get_action(db, sensor_data, sensor_action_id, last_available=None):
+  s = create_session(db)
+
+  query = s.query(Action).filter(Action.board_id == sensor_data['board_id'])
+  query = query.filter(Action.sensor_type == sensor_data['sensor_type'])
+  query = query.filter(Action.sensor_action_id == sensor_action_id)
+
+  if last_available:
+    query.order_by(desc(Action.id)).limit(last_available).from_self()
+
+  return query.all()
+
+
+def insert_action(db, sensor_data, sensor_action_id):
+  s = create_session(db)
+
+  now = int(time.time())
+
+  s.add(Action(board_id = sensor_data['board_id'],
+          sensor_type = sensor_data['sensor_type'],
+          sensor_action_id = sensor_action_id,
+          last_update = now))
+
+  commit(s)
+
 
 def commit(session=None):
   if session:
