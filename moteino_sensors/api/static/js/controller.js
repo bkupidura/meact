@@ -54,18 +54,20 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', 
     $scope.timers = Array();
     $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
-    $scope.offline_timeout = dashboardConfig.offline_timeout;
+    $scope.offline_timeout = dashboardConfig.offline['timeout'];
+    $scope.always_online = dashboardConfig.offline['always_online'];
+    $scope.offline_exclude = dashboardConfig.offline['exclude'];
     $scope.commands = dashboardConfig.commands;
 
     updateBoards = function(){
       var now = new Date() / 1000;
-      BoardService.getBoard(now - $scope.offline_timeout, null, null).then(function(data){
-        $scope.boards = data['data'];
+      BoardService.getBoard().then(function(data){
+        $scope.boards = $filter('BoardOnline')(data['data'], $scope.offline_timeout, $scope.always_online);
       });
     }
     updateBoardsOffline = function(){
       BoardService.getBoard().then(function(data){
-        $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout);
+        $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout, $scope.always_online, $scope.offline_exclude);
       });
     }
     getCommands = function(boardID) {
@@ -127,17 +129,19 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
     $scope.timers = Array();
     $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
-    $scope.offline_timeout = dashboardConfig.offline_timeout;
+    $scope.offline_timeout = dashboardConfig.offline['timeout'];
+    $scope.always_online = dashboardConfig.offline['always_online'];
+    $scope.offline_exclude = dashboardConfig.offline['exclude'];
 
     updateBoards = function(){
       var now = new Date() / 1000;
-      BoardService.getBoard(now - $scope.offline_timeout, null, null).then(function(data){
-        $scope.boards = data['data'];
+      BoardService.getBoard().then(function(data){
+        $scope.boards = $filter('BoardOnline')(data['data'], $scope.offline_timeout, $scope.always_online);
       });
     }
     updateBoardsOffline = function(){
       BoardService.getBoard().then(function(data){
-        $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout);
+        $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout, $scope.always_online, $scope.offline_exclude);
       });
     }
     boardOpen = function(board){

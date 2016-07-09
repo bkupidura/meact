@@ -26,5 +26,9 @@ dashboardApp.constant('dashboardConfig', {
     'Motion': {'type': 'scatter', 'yAxisLabel': 'Motion', 'yRound': '0', 'title': 'Detected motion'},
     'RSSI': {'type': 'line', 'yAxisLabel': 'RSSI', 'yRound': '0', 'title': 'Board RSSI'}
   },
-  offline_timeout: 1800,
+  offline: {
+    'timeout': 1800,
+    'always_online': [],
+    'exclude': []
+  }
 });

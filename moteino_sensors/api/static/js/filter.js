@@ -1,8 +1,20 @@
-angular.module('dashboardApp').filter('BoardOffline', function() {
-  return function(items, offline_timeout){
+angular.module('dashboardApp').filter('BoardOnline', function() {
+  return function(items, offline_timeout, always_online){
     var now = new Date() / 1000;
     return items.filter(function(element){
-      if (now - element.last_update > offline_timeout){
+      if (now - element.last_update <= offline_timeout || always_online.indexOf(element.id) !== -1){
+        return true;
+      }
+    });
+  }
+});
+
+angular.module('dashboardApp').filter('BoardOffline', function() {
+  return function(items, offline_timeout, always_online, offline_exclude){
+    var now = new Date() / 1000;
+    return items.filter(function(element){
+      if ((now - element.last_update > offline_timeout && always_online.indexOf(element.id) === -1) &&
+          offline_exclude.indexOf(element.id) === -1){
         return true;
       }
     });
