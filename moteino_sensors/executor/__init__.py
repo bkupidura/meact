@@ -170,6 +170,54 @@ class Executor(mqtt.Mqtt):
 
     return result
 
+  def _check_status(self, sensor_check_status):
+    check_status_result = True
+    for check_status in sensor_check_status:
+      _, check_status_result = utils.treshold_helper(check_status['threshold'],
+              self.status.get(check_status['name']))
+      if not check_status_result:
+        break
+
+    return check_status_result
+
+  def _check_metric(self, sensor_check_metric, sensor_data):
+    check_metric_result = True
+    for check_metric in sensor_check_metric:
+      board_ids = check_metric.get('board_ids', [])
+      board_ids = map(lambda x: x.format(**sensor_data), board_ids)
+
+      try:
+        metrics = self._get_value_count(check_metric['value_count'],
+                board_ids,
+	        check_metric.get('sensor_type'),
+	        check_metric.get('start_offset'),
+	        check_metric.get('end_offset'))
+      except OperationalError as e:
+        LOG.error("Fail to get metrics '%s'", e)
+        check_metric_result = False
+        break
+
+      _, check_metric_result = utils.treshold_helper(check_metric['threshold'],
+              metrics)
+
+      if not check_metric_result:
+        break
+
+    return check_metric_result
+
+  def _check_action_interval(self, sensor_data, sensor_action_id, action_interval):
+    try:
+      last_actions = database.get_action(self.db, sensor_data, sensor_action_id, 1)
+    except OperationalError as e:
+      LOG.error("Fail to get action '%s'", e)
+
+    if not last_actions:
+      last_action = 0
+    else:
+      last_action = last_actions[0].last_update
+
+    return utils.time_offset(-last_action) > action_interval
+
   def _get_value_count(self, value_count, board_ids=None, sensor_type=None, start_offset=None, end_offset=None):
     db_params = {
       'db': self.db,
@@ -213,47 +261,16 @@ class Executor(mqtt.Mqtt):
         continue
 
       #Check status threshold function
-      check_status_result = True
-      for check_status in sensor_action['check_status']:
-        _, check_status_result = utils.treshold_helper(check_status['threshold'],
-                self.status.get(check_status['name']))
-        if not check_status_result:
-          break
-
-      if not check_status_result:
+      if not self._check_status(sensor_action['check_status']):
         continue
 
       #Check metrics threshold function
-      check_metric_result = True
-      for check_metric in sensor_action['check_metric']:
-        board_ids = check_metric.get('board_ids')
-
-        if board_ids:
-          board_ids = map(lambda x: x.format(**sensor_data), board_ids)
-
-        metrics = self._get_value_count(check_metric['value_count'],
-                board_ids,
-                check_metric.get('sensor_type'),
-                check_metric.get('start_offset'),
-                check_metric.get('end_offset')
-                )
-        _, check_metric_result = utils.treshold_helper(check_metric['threshold'],
-                metrics)
-
-        if not check_metric_result:
-          break
-
-      if not check_metric_result:
+      if not self._check_metric(sensor_action['check_metric'], sensor_data):
         continue
 
       #Check last action time
-      last_actions = database.get_action(self.db, sensor_data, sensor_action['id'], 1)
-      if not last_actions:
-        last_action = 0
-      else:
-        last_action = last_actions[0].last_update
-
-      if not utils.time_offset(-last_action) > sensor_action['action_interval']:
+      if not self._check_action_interval(sensor_data, sensor_action['id'],
+              sensor_action['action_interval']):
         continue
 
       LOG.info("Action execute for data '%s'", sensor_data)
