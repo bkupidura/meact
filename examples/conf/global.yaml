@@ -13,6 +13,11 @@ defaults:
         mgmt/status: 'mgmt/status/#'
       mgmt/status: 'mgmt/status'
 #
+# Manage configuration
+#
+manage:
+  db_string: *default_db_string
+#
 # Executor configuration
 #
 executor:

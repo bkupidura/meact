@@ -85,11 +85,9 @@ def create_session(db):
   return Session()
 
 
-def create_db(db, boards_map):
+def create_db(db):
   Base.metadata.drop_all(db)
   Base.metadata.create_all(db)
-
-  sync_boards(db, boards_map)
 
 
 def sync_boards(db, boards_map):
