@@ -203,9 +203,9 @@ def get_action(db, sensor_data, sensor_action_id, last_available=None):
   query = query.filter(Action.sensor_action_id == sensor_action_id)
 
   if last_available:
-    query.order_by(desc(Action.id)).limit(last_available).from_self()
+    query = query.order_by(desc(Action.id)).limit(last_available).from_self()
 
-  return query.all()
+  return query.order_by(Action.id).all()
 
 
 def insert_action(db, sensor_data, sensor_action_id):
