@@ -146,7 +146,7 @@ def eval_helper(threshold_lambda, arg1=None):
     else:
       LOG.warning('Too much arguments passed to threshold')
   except Exception as e:
-    LOG.error("Exception '%s' in lambda '%s' args '%s' '%s'", e, threshold_lambda, arg1, arg2)
+    LOG.error("Exception '%s' in lambda '%s' args '%s'", e, threshold_lambda, arg1)
     threshold_result = False
 
   return threshold_result
