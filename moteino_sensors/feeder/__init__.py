@@ -66,8 +66,9 @@ class Feeder(mqtt.Mqtt):
 
   def _check_feed_interval(self, feed_name, result, interval):
     try:
-      last_feeds = database.get_feed(self.db, feed_name,
-              result, 1)
+      last_feeds = database.get_feed(self.db, feed_name=feed_name,
+              result=result,
+              last_available=1)
     except OperationalError as e:
       last_feeds = None
       LOG.error("Fail to get feeds '%s'", e)

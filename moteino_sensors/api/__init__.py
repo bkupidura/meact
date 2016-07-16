@@ -66,12 +66,12 @@ def post_status():
     app.config['mqtt'].publish_status(data)
 
 def handle_board_endpoint(board_id = None, sensor_type = None, start = None, end = None):
-  boards = database.get_boards(app.config['db'], board_ids=board_id)
+  boards = database.get_board(app.config['db'], board_ids=board_id)
 
   board_ids = [board.board_id for board in boards]
   board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
-  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_ids, start=start, end=end, sensor_type=sensor_type)
+  last_metrics = database.get_last_metric(app.config['db'], board_ids=board_ids, start=start, end=end, sensor_type=sensor_type)
 
   output = dict()
 
@@ -113,11 +113,11 @@ def post_board(board_id = None):
 
 
 def handle_graph_endpoint(board_id = None, graph_type = None, start = None, end = None, last_available = None):
-  boards = database.get_boards(app.config['db'])
+  boards = database.get_board(app.config['db'])
 
   board_desc = dict((board.board_id, board.board_desc) for board in boards)
 
-  last_metrics = database.get_last_metrics(app.config['db'], board_ids=board_id, sensor_type=graph_type)
+  last_metrics = database.get_last_metric(app.config['db'], board_ids=board_id, sensor_type=graph_type)
 
   output = list()
 
@@ -128,7 +128,7 @@ def handle_graph_endpoint(board_id = None, graph_type = None, start = None, end 
         'data': []
     })
 
-    metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, start=start, end=end)
+    metrics = database.get_metric(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, start=start, end=end)
     if not metrics and last_available:
       metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, last_available=last_available)
 

@@ -107,7 +107,7 @@ def create_db(db):
   Base.metadata.create_all(db)
 
 
-def sync_boards(db, boards_map):
+def sync_board(db, boards_map):
   s = create_session(db)
 
   s.query(Board).delete()
@@ -147,7 +147,7 @@ def prepare_board_ids(board_ids=None):
   return board_ids
 
 
-def get_boards(db, board_ids=None):
+def get_board(db, board_ids=None):
   s = create_session(db)
 
   board_ids = prepare_board_ids(board_ids)
@@ -160,7 +160,7 @@ def get_boards(db, board_ids=None):
   return boards.all()
 
 
-def prepare_metrics(db, table, board_ids=None, sensor_type=None, start=None, end=None):
+def prepare_metric(db, table, board_ids=None, sensor_type=None, start=None, end=None):
   board_ids = prepare_board_ids(board_ids)
 
   s = create_session(db)
@@ -182,14 +182,14 @@ def prepare_metrics(db, table, board_ids=None, sensor_type=None, start=None, end
   return query
 
 
-def get_last_metrics(db, board_ids=None, sensor_type=None, start=None, end=None):
-  last_metrics = prepare_metrics(db, LastMetric, board_ids, sensor_type, start, end)
+def get_last_metric(db, board_ids=None, sensor_type=None, start=None, end=None):
+  last_metrics = prepare_metric(db, LastMetric, board_ids, sensor_type, start, end)
 
   return last_metrics.all()
 
 
-def get_metrics(db, board_ids=None, sensor_type=None, start=None, end=None, last_available=None):
-  metrics = prepare_metrics(db, Metric, board_ids, sensor_type, start, end)
+def get_metric(db, board_ids=None, sensor_type=None, start=None, end=None, last_available=None):
+  metrics = prepare_metric(db, Metric, board_ids, sensor_type, start, end)
 
   if last_available:
     metrics = metrics.order_by(desc(Metric.id)).limit(last_available).from_self()
@@ -205,19 +205,26 @@ def update_metric(db, metric_id=None, sensor_data=None):
     commit(s)
 
 
-def delete_metrics(db, record_ids=None):
-  if record_ids:
-    s = create_session(db)
-    query = s.query(Metric).filter(Metric.id.in_(record_ids)).delete('fetch')
-    commit(s)
-
-
-def get_action(db, board_id, sensor_type, sensor_action_id, last_available=None):
+def get_action(db, board_ids=None, sensor_type=None, sensor_action_id=None, start=None, end=None, last_available=None):
+  board_ids = prepare_board_ids(board_ids)
   s = create_session(db)
 
-  query = s.query(Action).filter(Action.board_id == board_id)
-  query = query.filter(Action.sensor_type == sensor_type)
-  query = query.filter(Action.sensor_action_id == sensor_action_id)
+  query = s.query(Action)
+
+  if board_ids:
+    query = query.filter(Action.board_id.in_(board_ids))
+
+  if sensor_type:
+    query = query.filter(Action.sensor_type == sensor_type)
+
+  if sensor_action_id:
+    query = query.filter(Action.sensor_action_id == sensor_action_id)
+
+  if start:
+    query = query.filter(Action.last_update >= start)
+
+  if end:
+    query = query.filter(Action.last_update <= end)
 
   if last_available:
     query = query.order_by(desc(Action.id)).limit(last_available).from_self()
@@ -238,11 +245,22 @@ def insert_action(db, board_id, sensor_type, sensor_action_id):
   commit(s)
 
 
-def get_feed(db, feed_name, result, last_available=None):
+def get_feed(db, feed_name=None, result=None, start=None, end=None, last_available=None):
   s = create_session(db)
 
-  query = s.query(Feed).filter(Feed.feed_name == feed_name)
-  query = query.filter(Feed.result == result)
+  query = s.query(Feed)
+
+  if feed_name:
+    query = query.filter(Feed.feed_name == feed_name)
+
+  if result:
+    query = query.filter(Feed.result == result)
+
+  if start:
+    query = query.filter(Feed.last_update >= start)
+
+  if end:
+    query = query.filter(Feed.last_update <= end)
 
   if last_available:
     query = query.order_by(desc(Feed.id)).limit(last_available).from_self()
@@ -260,6 +278,13 @@ def insert_feed(db, feed_name, result):
           last_update = now))
 
   commit(s)
+
+
+def delete_row(db, table, record_ids=None):
+  if record_ids:
+    s = create_session(db)
+    query = s.query(table).filter(table.id.in_(record_ids)).delete('fetch')
+    commit(s)
 
 
 def commit(session=None):

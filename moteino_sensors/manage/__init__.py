@@ -10,6 +10,7 @@ def get_global_config(config_dir):
   conf = utils.load_config(config_dir + '/global.yaml')
   return conf.get('manage', {})
 
+
 def create_db(args):
   LOG.info('Creating DB schema')
 
@@ -18,6 +19,7 @@ def create_db(args):
 
   database.create_db(db)
 
+
 def sync_db_desc(args):
   LOG.info('Syncing boards description')
 
@@ -25,7 +27,8 @@ def sync_db_desc(args):
   db = database.connect(db_string)
   boards_map = utils.load_config(args.dir + '/boards.yaml')
 
-  database.sync_boards(db, boards_map)
+  database.sync_board(db, boards_map)
+
 
 def aggregate_metric(args):
 
@@ -40,7 +43,7 @@ def aggregate_metric(args):
     return current_type
 
   def aggregate_metrics(db, start, end, sensor_type, execute):
-    metrics = database.get_metrics(db, start=start, end=end, sensor_type=sensor_type)
+    metrics = database.get_metric(db, start=start, end=end, sensor_type=sensor_type)
     LOG.info('Got %d metrics between %s and %s', len(metrics), start, end)
 
     new_records = dict()
@@ -91,7 +94,7 @@ def aggregate_metric(args):
 
     LOG.info("Delete %d metrics", len(ids_to_delete))
     if execute:
-      database.delete_metrics(db, ids_to_delete)
+      database.delete_row(db, database.Metric, ids_to_delete)
 
   # Map policy name to seconds
   policy_map = {
@@ -115,6 +118,37 @@ def aggregate_metric(args):
     policy_start += policy_map[args.policy]
     policy_end += policy_map[args.policy]
 
+
+def clean_action(args):
+  LOG.info('Cleaning action table')
+
+  db_string = get_global_config(args.dir).get('db_string')
+  db = database.connect(db_string)
+
+  actions = database.get_action(db, start=args.start, end=args.end)
+  LOG.info('Got %d actions between %s and %s', len(actions), args.start, args.end)
+
+  ids_to_delete = [action.id for action in actions]
+
+  if args.execute:
+    database.delete_row(db, database.Action, ids_to_delete)
+
+
+def clean_feed(args):
+  LOG.info('Cleaning feeds table')
+
+  db_string = get_global_config(args.dir).get('db_string')
+  db = database.connect(db_string)
+
+  feeds = database.get_feed(db, start=args.start, end=args.end)
+  LOG.info('Got %d feeds between %s and %s', len(feeds), args.start, args.end)
+
+  ids_to_delete = [feed.id for feed in feeds]
+
+  if args.execute:
+    database.delete_row(db, database.Feed, ids_to_delete)
+
+
 def main():
   parser = utils.create_arg_parser('Manage')
   subparsers = parser.add_subparsers()
@@ -132,6 +166,18 @@ def main():
   p_aggregate_metric.add_argument('--sensor-type', required=False, help='sensor_type for aggregate, if missing we will aggregate all sensor_type')
   p_aggregate_metric.add_argument('--execute', required=False, help='Execute data aggregation, without this DB will not be changed', action="store_true")
   p_aggregate_metric.set_defaults(func=aggregate_metric)
+
+  p_clean_action = subparsers.add_parser('clean-action', help='Clean (remove) old records from action table')
+  p_clean_action.add_argument('--start', required=True, help='Start time for cleaning (seconds since epoch)')
+  p_clean_action.add_argument('--end', required=True, help='End time for cleaning (seconds since epoch)')
+  p_clean_action.add_argument('--execute', required=False, help='Execute data cleaning, without this DB will not be changed', action="store_true")
+  p_clean_action.set_defaults(func=clean_action)
+
+  p_clean_feed = subparsers.add_parser('clean-feed', help='Clean (remove) old records from feed table')
+  p_clean_feed.add_argument('--start', required=True, help='Start time for cleaning (seconds since epoch)')
+  p_clean_feed.add_argument('--end', required=True, help='End time for cleaning (seconds since epoch)')
+  p_clean_feed.add_argument('--execute', required=False, help='Execute data cleaning, without this DB will not be changed', action="store_true")
+  p_clean_feed.set_defaults(func=clean_feed)
 
   args = parser.parse_args()
 

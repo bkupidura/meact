@@ -79,7 +79,7 @@ class Executor(mqtt.Mqtt):
         self.sensors_map[sensor_type] = sensor_config
 
   def _get_boards(self, db):
-    boards = database.get_boards(db)
+    boards = database.get_board(db)
     self.boards_map = dict((board.board_id, board.board_desc) for board in boards)
 
   def _on_mgmt_status(self, client, userdata, msg):
@@ -207,8 +207,10 @@ class Executor(mqtt.Mqtt):
 
   def _check_action_interval(self, sensor_data, sensor_action_id, action_interval):
     try:
-      last_actions = database.get_action(self.db, sensor_data['board_id'],
-              sensor_data['sensor_type'], sensor_action_id, 1)
+      last_actions = database.get_action(self.db, board_ids=sensor_data['board_id'],
+              sensor_type=sensor_data['sensor_type'],
+              sensor_action_id=sensor_action_id,
+              last_available=1)
     except OperationalError as e:
       last_actions = None
       LOG.error("Fail to get action '%s'", e)
@@ -231,9 +233,9 @@ class Executor(mqtt.Mqtt):
 
     if value_count['type'] == 'Metric':
       db_params['last_available'] = value_count['count']
-      metrics = database.get_metrics(**db_params)
+      metrics = database.get_metric(**db_params)
     elif value_count['type'] == 'LastMetric':
-      metrics = database.get_last_metrics(**db_params)
+      metrics = database.get_last_metric(**db_params)
     else:
       metrics = []
 
