@@ -207,7 +207,8 @@ class Executor(mqtt.Mqtt):
 
   def _check_action_interval(self, sensor_data, sensor_action_id, action_interval):
     try:
-      last_actions = database.get_action(self.db, sensor_data, sensor_action_id, 1)
+      last_actions = database.get_action(self.db, sensor_data['board_id'],
+              sensor_data['sensor_type'], sensor_action_id, 1)
     except OperationalError as e:
       last_actions = None
       LOG.error("Fail to get action '%s'", e)
@@ -280,7 +281,8 @@ class Executor(mqtt.Mqtt):
               action_config,
               sensor_action['action_config']):
         try:
-          database.insert_action(self.db, sensor_data, sensor_action['id'])
+          database.insert_action(self.db, sensor_data['board_id'],
+                  sensor_data['sensor_type'], sensor_action['id'])
         except OperationalError as e:
           LOG.error("Fail to save action '%s'", e)
 

@@ -75,6 +75,23 @@ class Action(Base):
             self.last_update)
 
 
+class Feed(Base):
+  __tablename__ = 'feeds'
+
+  id = Column(Integer, primary_key=True)
+  feed_name = Column(Text, nullable=False)
+  result = Column(Integer, nullable=False)
+  last_update = Column(Integer, nullable=False)
+
+  __table_args__ = (Index('idx_feeds', 'feed_name', 'result', 'last_update'), )
+
+  def __repr__(self):
+    return "<Feed(feed_name='%s', result='%s', last_update='%s')>" % (
+            self.feed_name,
+            self.result,
+            self.last_update)
+
+
 def connect(connect_string):
   return create_engine(connect_string, connect_args={'check_same_thread': False})
 
@@ -195,11 +212,11 @@ def delete_metrics(db, record_ids=None):
     commit(s)
 
 
-def get_action(db, sensor_data, sensor_action_id, last_available=None):
+def get_action(db, board_id, sensor_type, sensor_action_id, last_available=None):
   s = create_session(db)
 
-  query = s.query(Action).filter(Action.board_id == sensor_data['board_id'])
-  query = query.filter(Action.sensor_type == sensor_data['sensor_type'])
+  query = s.query(Action).filter(Action.board_id == board_id)
+  query = query.filter(Action.sensor_type == sensor_type)
   query = query.filter(Action.sensor_action_id == sensor_action_id)
 
   if last_available:
@@ -208,14 +225,38 @@ def get_action(db, sensor_data, sensor_action_id, last_available=None):
   return query.order_by(Action.id).all()
 
 
-def insert_action(db, sensor_data, sensor_action_id):
+def insert_action(db, board_id, sensor_type, sensor_action_id):
   s = create_session(db)
 
   now = int(time.time())
 
-  s.add(Action(board_id = sensor_data['board_id'],
-          sensor_type = sensor_data['sensor_type'],
+  s.add(Action(board_id = board_id,
+          sensor_type = sensor_type,
           sensor_action_id = sensor_action_id,
+          last_update = now))
+
+  commit(s)
+
+
+def get_feed(db, feed_name, result, last_available=None):
+  s = create_session(db)
+
+  query = s.query(Feed).filter(Feed.feed_name == feed_name)
+  query = query.filter(Feed.result == result)
+
+  if last_available:
+    query = query.order_by(desc(Feed.id)).limit(last_available).from_self()
+
+  return query.order_by(Feed.id).all()
+
+
+def insert_feed(db, feed_name, result):
+  s = create_session(db)
+
+  now = int(time.time())
+
+  s.add(Feed(feed_name = feed_name,
+          result = result,
           last_update = now))
 
   commit(s)

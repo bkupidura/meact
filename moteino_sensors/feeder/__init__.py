@@ -5,48 +5,23 @@ import json
 import logging
 import time
 
+from sqlalchemy.exc import OperationalError
+
+from moteino_sensors import database
 from moteino_sensors import mqtt
 from moteino_sensors import utils
 from moteino_sensors.feeder import feeds
 
-class FeedsStatusAdapter(dict):
-  def build_defaults(self, feed_name):
-    self.setdefault(feed_name, {
-      'last_feed': 0,
-      'last_fail': 0
-    })
-
-  def check_last_feed(self, feed_name, feed_interval):
-    now = int(time.time())
-    last_feed = self[feed_name]['last_feed']
-    if now - last_feed <= feed_interval:
-      return False
-    return True
-
-  def check_last_fail(self, feed_name, fail_interval):
-    now = int(time.time())
-    last_fail = self[feed_name]['last_fail']
-    if now - last_fail <= fail_interval:
-      return False
-    return True
-
-  def update_last_feed(self, feed_name):
-    now = int(time.time())
-    self[feed_name]['last_feed'] = now
-
-  def update_last_fail(self, feed_name):
-    now = int(time.time())
-    self[feed_name]['last_fail'] = now
 
 class Feeder(mqtt.Mqtt):
-  def __init__(self, mqtt_config, feeds_map_file):
+  def __init__(self, db_string, mqtt_config, feeds_map_file):
     super(Feeder, self).__init__()
     self.name = 'feeder'
     self.enabled = Event()
     self.enabled.set()
     self.status = {'feeder': 1}
     self.mqtt_config = mqtt_config
-    self.feeds_status = FeedsStatusAdapter()
+    self.db = database.connect(db_string)
     self.start_mqtt()
     self._validate_feeds(feeds_map_file)
 
@@ -89,6 +64,21 @@ class Feeder(mqtt.Mqtt):
     else:
       return feed_result.get('sensor_data', None)
 
+  def _check_feed_interval(self, feed_name, result, interval):
+    try:
+      last_feeds = database.get_feed(self.db, feed_name,
+              result, 1)
+    except OperationalError as e:
+      last_feeds = None
+      LOG.error("Fail to get feeds '%s'", e)
+
+    if not last_feeds:
+      last_feed = 0
+    else:
+      last_feed = last_feeds[0].last_update
+
+    return utils.time_offset(-last_feed) > interval
+
   def run(self):
     LOG.info('Starting')
     self.loop_start()
@@ -99,25 +89,26 @@ class Feeder(mqtt.Mqtt):
         feed_config = self.feeds_map[feed_name]
         feed_enabled = int(self.status.get(self.name + '/' + feed_name, 1))
 
-        self.feeds_status.build_defaults(feed_name)
-
         if not feed_enabled:
           continue
 
-        if not self.feeds_status.check_last_feed(feed_name, feed_config['feed_interval']):
+        if not self._check_feed_interval(feed_name, 0, feed_config['feed_interval']):
           continue
 
-        if not self.feeds_status.check_last_fail(feed_name, feed_config['fail_interval']):
+        if not self._check_feed_interval(feed_name, 1, feed_config['fail_interval']):
           continue
 
         LOG.debug("Geting feeds from '%s'", feed_name)
         feed_result = self._feed_helper(feed_config)
 
-        if not feed_result:
-          self.feeds_status.update_last_fail(feed_name)
-          continue
-        else:
-          self.feeds_status.update_last_feed(feed_name)
+        try:
+          if not feed_result:
+            database.insert_feed(self.db, feed_name, 1)
+            continue
+          else:
+            database.insert_feed(self.db, feed_name, 0)
+        except OperationalError as e:
+          LOG.error("Fail to save feed '%s'", e)
 
         LOG.debug("Got feed provider response '%s'", feed_result)
 
@@ -126,7 +117,7 @@ class Feeder(mqtt.Mqtt):
           if sensor_data:
             self.publish_metric(feed_config['mqtt_topic'], sensor_data)
 
-      time.sleep(2)
+      time.sleep(10)
 
 
 LOG = logging.getLogger(__name__)
@@ -143,7 +134,9 @@ def main():
   logging_conf = conf.get('logging', {})
   utils.create_logger(logging_conf)
 
-  feeder = Feeder(mqtt_config=conf['mqtt'], feeds_map_file=feeds_map_file)
+  feeder = Feeder(db_string=conf['db_string'],
+          mqtt_config=conf['mqtt'],
+          feeds_map_file=feeds_map_file)
   feeder.run()
 
 

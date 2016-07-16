@@ -95,6 +95,7 @@ srl:
 feeder:
   logging:
     << : *default_logging
+  db_string: *default_db_string
   mqtt:
     << : *default_mqtt
 #
