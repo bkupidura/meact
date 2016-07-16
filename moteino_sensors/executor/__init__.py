@@ -209,6 +209,7 @@ class Executor(mqtt.Mqtt):
     try:
       last_actions = database.get_action(self.db, sensor_data, sensor_action_id, 1)
     except OperationalError as e:
+      last_actions = None
       LOG.error("Fail to get action '%s'", e)
 
     if not last_actions:
