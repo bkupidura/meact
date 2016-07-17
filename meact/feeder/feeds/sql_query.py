@@ -3,7 +3,7 @@ import sys
 
 from jq import jq
 
-from moteino_sensors import database
+from meact import database
 
 
 LOG = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ def sql_query(feed_config, feed_result):
   """Get sensor_data from SQL query
 
   feed_config = {
-    "db_string": "sqlite:////etc/mgw/mgw.db",
+    "db_string": "sqlite:////etc/meact/meact.db",
     "db_query": "SELECT board_id,sensor_data FROM last_metrics"
   }
   """

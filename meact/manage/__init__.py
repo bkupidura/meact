@@ -2,8 +2,8 @@
 import logging
 import sys
 
-from moteino_sensors import database
-from moteino_sensors import utils
+from meact import database
+from meact import utils
 
 
 def get_global_config(config_dir):
@@ -150,10 +150,10 @@ def clean_feed(args):
 
 
 def main():
-  parser = utils.create_arg_parser('Manage')
+  parser = utils.create_arg_parser('Meact Manage CLI')
   subparsers = parser.add_subparsers()
 
-  p_create_db = subparsers.add_parser('create-db', help='Create mgw database. CAUTION: IT WILL REMOVE OLD DATA')
+  p_create_db = subparsers.add_parser('create-db', help='Create meact database. CAUTION: IT WILL REMOVE OLD DATA')
   p_create_db.set_defaults(func=create_db)
 
   p_sync_db_desc = subparsers.add_parser('sync-db-desc', help='Sync boards description')

@@ -4,7 +4,7 @@ import sys
 
 from jq import jq
 
-from moteino_sensors import utils
+from meact import utils
 
 
 LOG = logging.getLogger(__name__)

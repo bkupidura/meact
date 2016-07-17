@@ -7,8 +7,8 @@ import time
 
 import serial
 
-from moteino_sensors import mqtt
-from moteino_sensors import utils
+from meact import mqtt
+from meact import utils
 
 class Srl(mqtt.Mqtt):
   def __init__(self, serial, mqtt_config, re_sensor_data):
@@ -76,7 +76,7 @@ class Srl(mqtt.Mqtt):
 LOG = logging.getLogger(__name__)
 
 def main():
-  parser = utils.create_arg_parser('SRL - mgw serial')
+  parser = utils.create_arg_parser('Meact SRL service')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.yaml')

@@ -6,7 +6,7 @@ import time
 
 import paho.mqtt.client as paho
 
-from moteino_sensors import utils
+from meact import utils
 
 LOG = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 
-from moteino_sensors import utils
+from meact import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ def send_pushover(data, action_config):
 
   Allow to send notification via pushover.net.
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "token": "auth_token",
     "user_key": "user_or_group_key",

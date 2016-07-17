@@ -9,7 +9,7 @@ TIMEOUT=5
 def send_mail(data, action_config):
   """Send mail via SMTP
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "sender": "root@example.com",
     "recipient": ["user@example.com"],

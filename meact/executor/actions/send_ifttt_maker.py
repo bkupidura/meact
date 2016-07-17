@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from moteino_sensors import utils
+from meact import utils
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
@@ -15,7 +15,7 @@ def send_ifttt_maker(data, action_config):
   {{value2}} will be set to data['sensor_data']
   {{value3}} will be set to data['board_id']
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "endpoint": "https://maker.ifttt.com/trigger",
     "auth_key": "authkey",

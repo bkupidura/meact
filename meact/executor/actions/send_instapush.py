@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 
-from moteino_sensors import utils
+from meact import utils
 
 
 LOG = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def send_instapush(data, action_config):
   - Trackers - message
   - Push message - RPI notification: {message}
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "event": "event_name",
     "endpoint": "https://api.instapush.im/v1/post",

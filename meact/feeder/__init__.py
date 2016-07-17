@@ -7,10 +7,10 @@ import time
 
 from sqlalchemy.exc import OperationalError
 
-from moteino_sensors import database
-from moteino_sensors import mqtt
-from moteino_sensors import utils
-from moteino_sensors.feeder import feeds
+from meact import database
+from meact import mqtt
+from meact import utils
+from meact.feeder import feeds
 
 
 class Feeder(mqtt.Mqtt):
@@ -125,7 +125,7 @@ LOG = logging.getLogger(__name__)
 FEEDS_MAPPING = utils.load_mapping(feeds)
 
 def main():
-  parser = utils.create_arg_parser('Feeder')
+  parser = utils.create_arg_parser('Meact Feeder service')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.yaml')

@@ -10,7 +10,7 @@ import time
 from jsonschema import Draft4Validator
 from jsonschema.exceptions import ValidationError
 
-from moteino_sensors.utils import schemas
+from meact.utils import schemas
 
 LOG = logging.getLogger(__name__)
 logging.getLogger("requests").setLevel(logging.CRITICAL)

@@ -13,7 +13,7 @@ logging.getLogger("gsmmodem.modem.GsmModem").setLevel(logging.CRITICAL)
 def send_sms_at(data, action_config):
   """Send SMS via local modem with AT commands
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "recipient": ["your-number", "your-number2'],
     "port": "/dev/ttyUSB1",

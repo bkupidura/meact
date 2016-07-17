@@ -5,7 +5,7 @@ defaults:
   logging: &default_logging
     level: 20
     formatter: '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-  db_string: &default_db_string 'sqlite:////etc/mgw/mgw.db'
+  db_string: &default_db_string 'sqlite:////etc/meact/meact.db'
   mqtt: &default_mqtt
     server: localhost
     topic:
@@ -123,4 +123,4 @@ api:
     << : *default_mqtt
   allowed_cidrs:
     - '127.0.0.1/24'
-  user_static_dir: '/etc/mgw/api/static'
+  user_static_dir: '/etc/meact/api/static'

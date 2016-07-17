@@ -11,10 +11,10 @@ import time
 
 from sqlalchemy.exc import OperationalError
 
-from moteino_sensors import database
-from moteino_sensors import mqtt
-from moteino_sensors import utils
-from moteino_sensors.executor import actions
+from meact import database
+from meact import mqtt
+from meact import utils
+from meact.executor import actions
 
 class SensorActionAdapter(dict):
   """Adapter for sensor action from SensorConfig
@@ -308,7 +308,7 @@ LOG = logging.getLogger(__name__)
 ACTIONS_MAPPING = utils.load_mapping(actions)
 
 def main():
-  parser = utils.create_arg_parser('Moteino executor')
+  parser = utils.create_arg_parser('Meact executor service')
   args = parser.parse_args()
 
   conf = utils.load_config(args.dir + '/global.yaml')

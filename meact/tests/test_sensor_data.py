@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from moteino_sensors import utils
+from meact import utils
 
 default_metric = {
   'board_id': '10',

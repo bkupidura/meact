@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from moteino_sensors import executor
-from moteino_sensors import utils
+from meact import executor
+from meact import utils
 
 
 default_sensor_config = {

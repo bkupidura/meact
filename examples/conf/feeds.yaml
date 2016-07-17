@@ -39,7 +39,7 @@ msd:
   fail_interval: 60
   mqtt_topic: 'executor/metric'
   params:
-    db_string: 'sqlite:////etc/mgw/mgw.db'
+    db_string: 'sqlite:////etc/meact/meact.db'
     db_query: >-
       SELECT board_id,max(last_update) FROM
       last_metrics GROUP BY board_id

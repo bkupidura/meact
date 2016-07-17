@@ -4,7 +4,7 @@ import sys
 import paho.mqtt.client as paho
 import paho.mqtt.publish as publish
 
-from moteino_sensors import utils
+from meact import utils
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
@@ -19,7 +19,7 @@ def send_mqtt(data, action_config):
   Ex. '{sensor_type}:enabled'
 
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "server": "localhost",
     "port": 1883,

@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from moteino_sensors import utils
+from meact import utils
 
 LOG = logging.getLogger(__name__)
 TIMEOUT=5
@@ -12,7 +12,7 @@ def send_bulksms(data, action_config):
 
   Bulksms is HTTP<->SMS gateway.
 
-  MGW configuration:
+  Meact configuration:
   action_config = {
     "endpoint": "https://bulksms.vsms.net/eapi/submission/send_sms/2/2.0",
     "user": "bulksms-user",
