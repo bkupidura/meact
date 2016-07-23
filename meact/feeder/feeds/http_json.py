@@ -48,13 +48,13 @@ def http_json(feed_config, feed_result):
           timeout=http_params['timeout'])
 
   if not req:
-    LOG.warning("Fail to get feeds from '%s'", url)
+    LOG.warning("Fail to get feeds from '%s'", http_params['url'])
     sys.exit(2)
 
   try:
     response = json.loads(req.text)
   except (ValueError, TypeError):
-    LOG.warning("No response from '%s'", url)
+    LOG.warning("No response from '%s'", http_params['url'])
     sys.exit(2)
 
   jq_result = jq(feed_config['expression']).transform(response, multiple_output=True)
