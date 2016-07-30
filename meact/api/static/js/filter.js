@@ -1,8 +1,7 @@
-angular.module('dashboardApp').filter('BoardOnline', function() {
-  return function(items, offline_timeout, always_online){
-    var now = new Date() / 1000;
+angular.module('dashboardApp').filter('AlwaysOnline', function() {
+  return function(items, always_online){
     return items.filter(function(element){
-      if (now - element.last_update <= offline_timeout || always_online.indexOf(element.id) !== -1){
+      if (always_online.indexOf(element.id) !== -1){
         return true;
       }
     });
@@ -13,8 +12,8 @@ angular.module('dashboardApp').filter('BoardOffline', function() {
   return function(items, offline_timeout, always_online, offline_exclude){
     var now = new Date() / 1000;
     return items.filter(function(element){
-      if ((now - element.last_update > offline_timeout && always_online.indexOf(element.id) === -1) &&
-          offline_exclude.indexOf(element.id) === -1){
+      if (now - element.last_update > offline_timeout && always_online.indexOf(element.id) === -1 &&
+              offline_exclude.indexOf(element.id) === -1){
         return true;
       }
     });
@@ -48,8 +47,6 @@ angular.module('dashboardApp').filter('MetricUnit', function() {
     switch (metric_type) {
       case 'voltage':
         return metric_value + ' V';
-      case 'seen':
-        return metric_value + ' seconds ago';
       case 'temperature':
         return metric_value + ' \u00B0C';
       default:

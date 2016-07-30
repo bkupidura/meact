@@ -27,6 +27,7 @@ dashboardControllers.controller('StatusCtrl', ['$scope', '$interval', 'dashboard
         });
       });
     }
+
     $scope.changeStatus = function(name){
       angular.forEach($scope.status, function(status_value, status_index){
         if (status_value['name'] == name){
@@ -52,7 +53,6 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', 
   function ($scope, $interval, $filter, $uibModal, dashboardConfig, BoardService, defaults) {
 
     $scope.timers = Array();
-    $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
     $scope.offline_timeout = dashboardConfig.offline['timeout'];
     $scope.always_online = dashboardConfig.offline['always_online'];
@@ -60,16 +60,27 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', 
     $scope.commands = dashboardConfig.commands;
 
     updateBoards = function(){
+      $scope.boards = defaults['boards'];
       var now = new Date() / 1000;
-      BoardService.getBoard().then(function(data){
-        $scope.boards = $filter('BoardOnline')(data['data'], $scope.offline_timeout, $scope.always_online);
+
+      BoardService.getBoard(now - $scope.offline_timeout).then(function(data){
+        $scope.boards = $scope.boards.concat(data['data']);
       });
+
+      if ($scope.always_online.length) {
+        BoardService.getBoard().then(function(data){
+          var always_online = $filter('AlwaysOnline')(data['data'], $scope.always_online);
+          $scope.boards = $scope.boards.concat(always_online);
+        });
+      }
     }
+
     updateBoardsOffline = function(){
       BoardService.getBoard().then(function(data){
         $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout, $scope.always_online, $scope.offline_exclude);
       });
     }
+
     getCommands = function(boardID) {
       if (boardID in $scope.commands) {
         return $scope.commands[boardID];
@@ -77,6 +88,7 @@ dashboardControllers.controller('BoardCtrl', ['$scope', '$interval', '$filter', 
         return $scope.commands['default'];
       }
     }
+
     $scope.actionOpen = function(boardID, boardDesc){
       var modalInstance = $uibModal.open({
         animation: true,
@@ -127,23 +139,33 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
   function ($scope, $interval, $filter, $uibModal, dashboardConfig, BoardService, defaults) {
 
     $scope.timers = Array();
-    $scope.boards = defaults['boards'];
     $scope.boards_offline = defaults['boards_offline'];
     $scope.offline_timeout = dashboardConfig.offline['timeout'];
     $scope.always_online = dashboardConfig.offline['always_online'];
     $scope.offline_exclude = dashboardConfig.offline['exclude'];
 
     updateBoards = function(){
+      $scope.boards = defaults['boards'];
       var now = new Date() / 1000;
-      BoardService.getBoard().then(function(data){
-        $scope.boards = $filter('BoardOnline')(data['data'], $scope.offline_timeout, $scope.always_online);
+
+      BoardService.getBoard(now - $scope.offline_timeout).then(function(data){
+        $scope.boards = $scope.boards.concat(data['data']);
       });
+
+      if ($scope.always_online.length) {
+        BoardService.getBoard().then(function(data){
+          var always_online = $filter('AlwaysOnline')(data['data'], $scope.always_online);
+          $scope.boards = $scope.boards.concat(always_online);
+        });
+      }
     }
+
     updateBoardsOffline = function(){
       BoardService.getBoard().then(function(data){
         $scope.boards_offline = $filter('BoardOffline')(data['data'], $scope.offline_timeout, $scope.always_online, $scope.offline_exclude);
       });
     }
+
     boardOpen = function(board){
       var modalInstance = $uibModal.open({
         animation: true,
@@ -157,6 +179,7 @@ dashboardControllers.controller('MapCtrl', ['$scope', '$interval', '$filter', '$
         }
       });
     }
+
     updateMap = function(){
       var svg_map = d3.select('#svg-map');
       angular.forEach($scope.boards, function(value, key){
@@ -263,12 +286,14 @@ dashboardControllers.controller('GraphCtrl', ['$scope', '$interval', '$routePara
         $scope.graphData();
       }
     }
+
     updateBoards = function(){
       var sensor_type = $filter('lowercase')($routeParams['type']);
       BoardService.getBoard(null, null, sensor_type).then(function(data){
         $scope.boards = data['data'];
       });
     }
+
     $scope.graphData = function(){
       var graph_type = $filter('lowercase')($routeParams['type']);
       var start_time = $filter('LastUpdate')($scope.begin_offset);
@@ -279,6 +304,9 @@ dashboardControllers.controller('GraphCtrl', ['$scope', '$interval', '$routePara
         $scope.chartConfig.loading = true;
         GraphService.getData(graph_type, start_time, board_ids, 10).then(function(data) {
           angular.forEach(data['data'], function(value, key){
+            for (i=0; i < value['data'].length; i++){
+              value['data'][i][0] *= 1000;
+            }
             graph_data.push({
               'id': value['id'],
               'name': value['desc'],
