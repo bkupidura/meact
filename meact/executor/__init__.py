@@ -146,13 +146,15 @@ class Executor(mqtt.Mqtt):
       sensor_config = sensor_action_config.get(action_name, {})
       action_config.update(sensor_config)
 
+      action_func_timeout = action_config.get('timeout') or action_func.get('timeout')
+
       if not action_func:
         LOG.warning('Unknown action %s', action_name)
         continue
 
       p = Process(target=action_func.get('func'), args=(sensor_data, action_config))
       p.start()
-      p.join(action_func.get('timeout'))
+      p.join(action_func_timeout)
       if p.is_alive():
         p.terminate()
         status = 255

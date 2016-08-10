@@ -37,12 +37,14 @@ class Feeder(mqtt.Mqtt):
         self.feeds_map[feed_name] = feed_config
         self.status[self.name + '/' + feed_name] = 1
 
-  def _feed_helper(self, feed_config):
-    feed_name = feed_config['name']
-    feed_func = FEEDS_MAPPING.get(feed_name)
+  def _feed_helper(self, feed_name, feed_config):
+    feed_provider_name = feed_config['name']
+    feed_func = FEEDS_MAPPING.get(feed_provider_name)
+
+    LOG.debug("Geting feeds from '%s'", feed_name)
 
     if not feed_func:
-      LOG.warning('Unknown feed provider %s', feed_name)
+      LOG.warning('Unknown feed provider %s', feed_provider_name)
       return
 
     feed_result = Manager().dict()
@@ -59,7 +61,7 @@ class Feeder(mqtt.Mqtt):
       status = p.exitcode
 
     if status:
-      LOG.error("Fail to execute feed provider '%s', exitcode '%d'", feed_name, status)
+      LOG.error("Fail to execute feed provider '%s' for '%s', exitcode '%d'", feed_provider_name, feed_name, status)
       return None
     else:
       return feed_result.get('sensor_data', None)
@@ -99,8 +101,7 @@ class Feeder(mqtt.Mqtt):
         if not self._check_feed_interval(feed_name, 1, feed_config['fail_interval']):
           continue
 
-        LOG.debug("Geting feeds from '%s'", feed_name)
-        feed_result = self._feed_helper(feed_config)
+        feed_result = self._feed_helper(feed_name, feed_config)
 
         try:
           if not feed_result:
