@@ -1,7 +1,7 @@
 import logging
 import time
 
-from sqlalchemy import Column, Integer, Text, Index, ForeignKey, desc, DDL, event, create_engine
+from sqlalchemy import Column, Integer, Text, Index, ForeignKey, desc, DDL, event, create_engine, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -196,6 +196,27 @@ def get_metric(db, board_ids=None, sensor_type=None, start=None, end=None, last_
 
   return metrics.order_by(Metric.id).all()
 
+
+def get_metric_aggregated(db, sensor_type=None, start=None, end=None):
+  s = create_session(db)
+  query = s.query(Metric.id,
+          Metric.board_id,
+          Metric.sensor_type,
+          func.sum(Metric.sensor_data).label('total'),
+          func.count(Metric.sensor_data).label('count'))
+
+  if sensor_type:
+    query = query.filter(Metric.sensor_type == sensor_type)
+
+  if start:
+    query = query.filter(Metric.last_update >= start)
+
+  if end:
+    query = query.filter(Metric.last_update <= end)
+
+  metrics = query.group_by(Metric.sensor_type, Metric.board_id)
+
+  return metrics.all()
 
 def update_metric(db, metric_id=None, sensor_data=None):
   s = create_session(db)

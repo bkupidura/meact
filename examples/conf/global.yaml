@@ -16,6 +16,27 @@ defaults:
 # Manage configuration
 #
 manage:
+  aggregate:
+    - type: 'int'
+      sensor_type:
+        - 'failedreport'
+        - 'rssi'
+        - 'sunrise'
+        - 'sunset'
+        - 'uptime'
+        - 'ping_gw'
+        - 'ping_internet'
+    - type: 'float'
+      precision: 2
+      sensor_type:
+        - 'voltage'
+    - type: 'float'
+      precision: 1
+      sensor_type:
+        - 'temperature'
+    - type: 'text'
+      sensor_type:
+        - 'geolocation'
   db_string: *default_db_string
 #
 # Executor configuration

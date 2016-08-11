@@ -32,65 +32,48 @@ def sync_db_desc(args):
 
 def aggregate_metric(args):
 
-  def check_data_type(type_to_check, current_type, sensor_data):
-    if not current_type:
-      try:
-        type_to_check(sensor_data)
-        return type_to_check
-      except ValueError:
-        return None
+  def compute_value(aggregate_detail, total_sum, count):
+    value_type = aggregate_detail['type']
 
-    return current_type
+    if value_type == 'int':
+      value = int(total_sum)/int(count)
+    elif value_type == 'float':
+      value = float(total_sum)/int(count)
+      value = round(value, aggregate_detail['precision'])
+    elif value_type == 'text':
+      value = None
 
-  def aggregate_metrics(db, start, end, sensor_type, execute):
-    metrics = database.get_metric(db, start=start, end=end, sensor_type=sensor_type)
-    LOG.info('Got %d metrics between %s and %s', len(metrics), start, end)
+    return value
 
-    new_records = dict()
+  def aggregate(aggregate_details, db, start, end, sensor_type, execute):
     ids_to_delete = []
-    for metric in metrics:
+    a_metrics = database.get_metric_aggregated(db, start=start, end=end, sensor_type=sensor_type)
 
-      if metric.sensor_type not in new_records:
-        data_type = check_data_type(int, None, metric.sensor_data)
-        data_type = check_data_type(float, data_type, metric.sensor_data)
+    for a_metric in a_metrics:
+      metric = {
+        'id': a_metric[0],
+        'board_id': a_metric[1],
+        'sensor_type': a_metric[2],
+        'total_sum': a_metric[3],
+        'count': a_metric[4]
+      }
 
-        if not data_type:
-          LOG.warning("Unknown data type for sensor '%s' data '%s'", metric.sensor_type, metric.sensor_data)
-          continue
+      for aggregate_detail in aggregate_details:
+        if metric['sensor_type'] in aggregate_detail['sensor_type']:
+          m_to_delete = database.get_metric(db, board_ids=metric['board_id'], sensor_type=metric['sensor_type'], start=start, end=end)
+          ids_to_delete += [m.id for m in m_to_delete if m.id != metric['id']]
 
-        new_records[metric.sensor_type] = dict()
+          new_value = compute_value(aggregate_detail, metric['total_sum'], metric['count'])
 
-        new_records[metric.sensor_type].setdefault('boards', {})
-        new_records[metric.sensor_type].setdefault('type', data_type)
-        if data_type == float:
-          new_records[metric.sensor_type].setdefault('prec', len(metric.sensor_data.split('.')[1]))
+          LOG.info("Update record with id '%d' for sensor_type '%s' for board_id '%s' with value '%s'",
+                metric['id'],
+                metric['sensor_type'],
+                metric['board_id'],
+                new_value)
 
-      new_records[metric.sensor_type]['boards'].setdefault(metric.board_id, {})
-      new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('sensor_sum', 0)
-      new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('sensor_num', 0)
-      new_records[metric.sensor_type]['boards'][metric.board_id].setdefault('id', metric.id)
+          if execute and new_value:
+            database.update_metric(db, metric['id'], new_value)
 
-      if new_records[metric.sensor_type]['boards'][metric.board_id]['id'] != metric.id:
-        ids_to_delete.append(metric.id)
-
-      new_records[metric.sensor_type]['boards'][metric.board_id]['sensor_sum'] += new_records[metric.sensor_type]['type'](metric.sensor_data)
-      new_records[metric.sensor_type]['boards'][metric.board_id]['sensor_num'] += 1
-
-    for record in new_records:
-      for board in new_records[record]['boards']:
-        record_data = new_records[record]['boards'][board]
-        new_data = record_data['sensor_sum'] / record_data['sensor_num']
-
-        if new_records[record]['type'] == float:
-          new_data = round(new_data, new_records[record]['prec'])
-
-        LOG.info("Update record with id '%d' for sensor_type '%s' for board_id '%s' with value '%s'",
-                record_data['id'],
-                record,
-                board,
-                new_data)
-        if execute:
-          database.update_metric(db, record_data['id'], new_data)
 
     LOG.info("Delete %d metrics", len(ids_to_delete))
     if execute:
@@ -110,11 +93,14 @@ def aggregate_metric(args):
 
   db_string = get_global_config(args.dir).get('db_string')
   db = database.connect(db_string)
+
+  aggregate_details = get_global_config(args.dir).get('aggregate')
+
   policy_start = int(args.start)
   policy_end = int(args.start) + policy_map[args.policy]
 
   while (policy_end <= int(args.end)):
-    aggregate_metrics(db, policy_start, policy_end, args.sensor_type, args.execute)
+    aggregate(aggregate_details, db, policy_start, policy_end, args.sensor_type, args.execute)
     policy_start += policy_map[args.policy]
     policy_end += policy_map[args.policy]
 
