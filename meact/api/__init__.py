@@ -130,7 +130,7 @@ def handle_graph_endpoint(board_id = None, graph_type = None, start = None, end 
 
     metrics = database.get_metric(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, start=start, end=end)
     if not metrics and last_available:
-      metrics = database.get_metrics(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, last_available=last_available)
+      metrics = database.get_metric(app.config['db'], board_ids=last_metric.board_id, sensor_type=graph_type, last_available=last_available)
 
     for metric in metrics:
       data = (metric.last_update, float(metric.sensor_data))
