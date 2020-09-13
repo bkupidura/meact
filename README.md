@@ -1,5 +1,7 @@
 # Meact - Wee IoT platform
 
+# THIS CODE IS ABANDONED. PLEASE DON'T USE IT!
+
 Meact (Metric-Action) task is to get metric from external stuff,
 write it to DB and perform various action.
 
