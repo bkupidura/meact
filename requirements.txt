@@ -3,7 +3,7 @@ bottle==0.12.9
 netaddr==0.7.18
 pyserial==3.1
 requests==2.20.0
-urllib3==1.24.2
+urllib3==1.26.5
 python-gsmmodem==0.9
 paho-mqtt==1.2
 SQLAlchemy==1.0.13
